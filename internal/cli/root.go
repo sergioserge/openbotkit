@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/priyanshujain/openbotkit/internal/cli/gmail"
+	memorycli "github.com/priyanshujain/openbotkit/internal/cli/memory"
 	whatsappcli "github.com/priyanshujain/openbotkit/internal/cli/whatsapp"
 	"github.com/spf13/cobra"
 )
@@ -28,6 +29,7 @@ var versionCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(gmail.Cmd)
+	rootCmd.AddCommand(memorycli.Cmd)
 	rootCmd.AddCommand(whatsappcli.Cmd)
 }
 
