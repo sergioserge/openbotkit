@@ -1,56 +1,43 @@
 package gmail
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/priyanshujain/openbotkit/config"
-	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
+	"github.com/priyanshujain/openbotkit/provider/google"
 	"github.com/spf13/cobra"
+	gapi "google.golang.org/api/gmail/v1"
 )
 
 var authCmd = &cobra.Command{
-	Use:   "auth",
-	Short: "Manage Gmail authentication",
+	Use:        "auth",
+	Short:      "Manage Gmail authentication",
+	Deprecated: "use 'obk auth google' instead",
 }
 
 var authLoginCmd = &cobra.Command{
-	Use:   "login",
-	Short: "Authenticate a Gmail account via OAuth2",
+	Use:        "login",
+	Short:      "Authenticate a Gmail account via OAuth2",
+	Deprecated: "use 'obk auth google login' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
 		}
 
-		if err := config.EnsureSourceDir("gmail"); err != nil {
-			return fmt.Errorf("create gmail dir: %w", err)
+		if err := config.EnsureProviderDir("google"); err != nil {
+			return fmt.Errorf("create provider dir: %w", err)
 		}
 
-		// Check that credentials file exists.
-		if _, err := os.Stat(cfg.Gmail.CredentialsFile); os.IsNotExist(err) {
-			return fmt.Errorf("credentials file not found: %s\nPlace your Google OAuth client credentials JSON at that path", cfg.Gmail.CredentialsFile)
-		}
-
-		// Prompt for email address.
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Enter the Gmail address to authenticate: ")
-		email, _ := reader.ReadString('\n')
-		email = strings.TrimSpace(email)
-		if email == "" {
-			return fmt.Errorf("email address is required")
-		}
-
-		g := gmailsrc.New(gmailsrc.Config{
-			CredentialsFile: cfg.Gmail.CredentialsFile,
-			TokenDBPath:     cfg.GmailTokenDBPath(),
+		gp := google.New(google.Config{
+			CredentialsFile: cfg.GoogleCredentialsFile(),
+			TokenDBPath:     cfg.GoogleTokenDBPath(),
 		})
 
 		ctx := context.Background()
-		if err := g.Login(ctx, email); err != nil {
+		email, err := gp.GrantScopes(ctx, "", []string{gapi.GmailReadonlyScope})
+		if err != nil {
 			return fmt.Errorf("login failed: %w", err)
 		}
 
@@ -60,8 +47,9 @@ var authLoginCmd = &cobra.Command{
 }
 
 var authLogoutCmd = &cobra.Command{
-	Use:   "logout",
-	Short: "Remove stored tokens for a Gmail account",
+	Use:        "logout",
+	Short:      "Remove stored tokens for a Gmail account",
+	Deprecated: "use 'obk auth google revoke' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
@@ -70,15 +58,15 @@ var authLogoutCmd = &cobra.Command{
 
 		account, _ := cmd.Flags().GetString("account")
 
-		tokenStore, err := gmailsrc.NewTokenStore(cfg.GmailTokenDBPath())
-		if err != nil {
-			return fmt.Errorf("open token store: %w", err)
-		}
-		defer tokenStore.Close()
+		gp := google.New(google.Config{
+			CredentialsFile: cfg.GoogleCredentialsFile(),
+			TokenDBPath:     cfg.GoogleTokenDBPath(),
+		})
+
+		ctx := context.Background()
 
 		if account == "" {
-			// List accounts and prompt.
-			accounts, err := tokenStore.ListAccounts()
+			accounts, err := gp.Accounts(ctx)
 			if err != nil || len(accounts) == 0 {
 				fmt.Println("No authenticated accounts.")
 				return nil
@@ -87,20 +75,15 @@ var authLogoutCmd = &cobra.Command{
 			for i, a := range accounts {
 				fmt.Printf("  %d. %s\n", i+1, a)
 			}
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Enter account to logout (or 'all'): ")
-			input, _ := reader.ReadString('\n')
-			account = strings.TrimSpace(input)
-			if account == "all" {
-				for _, a := range accounts {
-					tokenStore.DeleteToken(a)
-				}
-				fmt.Println("Logged out of all accounts.")
-				return nil
-			}
+			return fmt.Errorf("specify --account to logout")
 		}
 
-		if err := tokenStore.DeleteToken(account); err != nil {
+		scopes, err := gp.GrantedScopes(ctx, account)
+		if err != nil {
+			return fmt.Errorf("get scopes: %w", err)
+		}
+
+		if err := gp.RevokeScopes(ctx, account, scopes); err != nil {
 			return fmt.Errorf("logout failed: %w", err)
 		}
 		fmt.Printf("Logged out of %s\n", account)
@@ -109,22 +92,22 @@ var authLogoutCmd = &cobra.Command{
 }
 
 var authStatusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show connected accounts and token state",
+	Use:        "status",
+	Short:      "Show connected accounts and token state",
+	Deprecated: "use 'obk auth google status' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
 		}
 
-		tokenStore, err := gmailsrc.NewTokenStore(cfg.GmailTokenDBPath())
-		if err != nil {
-			fmt.Println("No authenticated accounts (token store not found).")
-			return nil
-		}
-		defer tokenStore.Close()
+		gp := google.New(google.Config{
+			CredentialsFile: cfg.GoogleCredentialsFile(),
+			TokenDBPath:     cfg.GoogleTokenDBPath(),
+		})
 
-		accounts, err := tokenStore.ListAccounts()
+		ctx := context.Background()
+		accounts, err := gp.Accounts(ctx)
 		if err != nil || len(accounts) == 0 {
 			fmt.Println("No authenticated accounts.")
 			return nil
@@ -132,12 +115,8 @@ var authStatusCmd = &cobra.Command{
 
 		fmt.Println("Authenticated Gmail accounts:")
 		for _, a := range accounts {
-			expiry, err := tokenStore.TokenExpiry(a)
-			status := "refresh token only"
-			if err == nil && expiry != nil {
-				status = fmt.Sprintf("token expires %s", expiry.Format("2006-01-02 15:04:05"))
-			}
-			fmt.Printf("  %s (%s)\n", a, status)
+			scopes, _ := gp.GrantedScopes(ctx, a)
+			fmt.Printf("  %s (scopes: %v)\n", a, scopes)
 		}
 		return nil
 	},

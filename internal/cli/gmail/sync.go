@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/provider/google"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
@@ -37,10 +38,15 @@ var syncCmd = &cobra.Command{
 
 		attachDir := filepath.Join(config.SourceDir("gmail"), "attachments")
 
-		g := gmailsrc.New(gmailsrc.Config{
-			CredentialsFile: cfg.Gmail.CredentialsFile,
-			TokenDBPath:     cfg.GmailTokenDBPath(),
+		if err := config.EnsureProviderDir("google"); err != nil {
+			return fmt.Errorf("create provider dir: %w", err)
+		}
+
+		gp := google.New(google.Config{
+			CredentialsFile: cfg.GoogleCredentialsFile(),
+			TokenDBPath:     cfg.GoogleTokenDBPath(),
 		})
+		g := gmailsrc.New(gmailsrc.Config{Provider: gp})
 
 		ctx := context.Background()
 		result, err := g.Sync(ctx, db, gmailsrc.SyncOptions{
