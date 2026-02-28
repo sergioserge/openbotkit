@@ -9,13 +9,18 @@ import (
 )
 
 type Config struct {
-	Gmail *GmailConfig `yaml:"gmail,omitempty"`
+	Gmail  *GmailConfig  `yaml:"gmail,omitempty"`
+	Memory *MemoryConfig `yaml:"memory,omitempty"`
 }
 
 type GmailConfig struct {
 	CredentialsFile     string        `yaml:"credentials_file,omitempty"`
 	DownloadAttachments bool          `yaml:"download_attachments,omitempty"`
 	Storage             StorageConfig `yaml:"storage,omitempty"`
+}
+
+type MemoryConfig struct {
+	Storage StorageConfig `yaml:"storage,omitempty"`
 }
 
 type StorageConfig struct {
@@ -65,6 +70,11 @@ func Default() *Config {
 				Driver: "sqlite",
 			},
 		},
+		Memory: &MemoryConfig{
+			Storage: StorageConfig{
+				Driver: "sqlite",
+			},
+		},
 	}
 	cfg.applyDefaults()
 	return cfg
@@ -80,6 +90,12 @@ func (c *Config) applyDefaults() {
 	if c.Gmail.CredentialsFile == "" {
 		c.Gmail.CredentialsFile = filepath.Join(SourceDir("gmail"), "credentials.json")
 	}
+	if c.Memory == nil {
+		c.Memory = &MemoryConfig{}
+	}
+	if c.Memory.Storage.Driver == "" {
+		c.Memory.Storage.Driver = "sqlite"
+	}
 }
 
 func (c *Config) GmailDataDSN() string {
@@ -91,4 +107,11 @@ func (c *Config) GmailDataDSN() string {
 
 func (c *Config) GmailTokenDBPath() string {
 	return filepath.Join(SourceDir("gmail"), "tokens.db")
+}
+
+func (c *Config) MemoryDataDSN() string {
+	if c.Memory.Storage.DSN != "" {
+		return c.Memory.Storage.DSN
+	}
+	return filepath.Join(SourceDir("memory"), "data.db")
 }
