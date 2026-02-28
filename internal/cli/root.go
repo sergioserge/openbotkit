@@ -8,6 +8,7 @@ import (
 
 	authcli "github.com/priyanshujain/openbotkit/internal/cli/auth"
 	"github.com/priyanshujain/openbotkit/internal/cli/gmail"
+	memorycli "github.com/priyanshujain/openbotkit/internal/cli/memory"
 	whatsappcli "github.com/priyanshujain/openbotkit/internal/cli/whatsapp"
 	"github.com/priyanshujain/openbotkit/internal/migrate"
 	"github.com/spf13/cobra"
@@ -40,6 +41,7 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(authcli.Cmd)
 	rootCmd.AddCommand(gmail.Cmd)
+	rootCmd.AddCommand(memorycli.Cmd)
 	rootCmd.AddCommand(whatsappcli.Cmd)
 }
 

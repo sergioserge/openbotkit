@@ -10,6 +10,7 @@ import (
 	"github.com/priyanshujain/openbotkit/provider/google"
 	"github.com/priyanshujain/openbotkit/source"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
+	memorysrc "github.com/priyanshujain/openbotkit/source/memory"
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
@@ -36,6 +37,9 @@ var statusCmd = &cobra.Command{
 		})
 		source.Register(wa)
 
+		mem := memorysrc.New(memorysrc.Config{})
+		source.Register(mem)
+
 		ctx := context.Background()
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "SOURCE\tCONNECTED\tACCOUNTS\tITEMS\tLAST SYNC")
@@ -61,6 +65,15 @@ var statusCmd = &cobra.Command{
 				})
 				if db != nil {
 					wasrc.Migrate(db)
+				}
+			case "memory":
+				dsn := cfg.MemoryDataDSN()
+				db, _ = store.Open(store.Config{
+					Driver: cfg.Memory.Storage.Driver,
+					DSN:    dsn,
+				})
+				if db != nil {
+					memorysrc.Migrate(db)
 				}
 			}
 
