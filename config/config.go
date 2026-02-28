@@ -188,8 +188,3 @@ func (c *Config) GoogleTokenDBPath() string {
 	return filepath.Join(ProviderDir("google"), "tokens.db")
 }
 
-// IsLegacyFormat returns true if the config uses the old gmail-level credentials
-// and hasn't been migrated to the providers structure yet.
-func (c *Config) IsLegacyFormat() bool {
-	return c.Gmail != nil && c.Providers == nil
-}
