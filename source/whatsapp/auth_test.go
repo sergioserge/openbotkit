@@ -109,8 +109,8 @@ func TestQREndpointAuthenticated(t *testing.T) {
 }
 
 func TestAuthPageContainsQRPolling(t *testing.T) {
-	if !strings.Contains(authPage, "setTimeout(poll,20000)") {
-		t.Fatal("expected page to poll every 20 seconds for QR rotation")
+	if !strings.Contains(authPage, "setTimeout(poll,hasQR?2000:5000)") {
+		t.Fatal("expected page to poll every 2 seconds after QR is shown")
 	}
 }
 

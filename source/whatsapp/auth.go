@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 )
 
 const authPage = `<!DOCTYPE html>
@@ -18,12 +19,12 @@ const authPage = `<!DOCTYPE html>
 <body><div class="container"><h2>Scan QR Code with WhatsApp</h2>
 <div id="qr"></div><p id="status">Loading...</p></div>
 <script>
-let qrEl=document.getElementById("qr"),statusEl=document.getElementById("status"),qrCode=null;
+let qrEl=document.getElementById("qr"),statusEl=document.getElementById("status"),qrCode=null,hasQR=false;
 function poll(){fetch("/api/qr").then(r=>r.json()).then(d=>{
-if(d.authenticated){statusEl.textContent="Authenticated! You can close this tab.";if(qrEl)qrEl.innerHTML="";return}
-if(d.qr){statusEl.textContent="Scan this QR code with your WhatsApp app";
+if(d.authenticated){statusEl.textContent="Authenticated! You can close this tab.";statusEl.style.color="#16a34a";if(qrEl)qrEl.innerHTML="";return}
+if(d.qr){hasQR=true;statusEl.textContent="Scan this QR code with your WhatsApp app";
 if(!qrCode){qrCode=new QRCode(qrEl,{text:d.qr,width:256,height:256})}else{qrCode.clear();qrCode.makeCode(d.qr)}}
-setTimeout(poll,20000)}).catch(()=>{statusEl.textContent="Connection lost";setTimeout(poll,5000)})}
+setTimeout(poll,hasQR?2000:5000)}).catch(()=>{statusEl.textContent="Connection lost";setTimeout(poll,5000)})}
 poll();
 </script></body></html>`
 
@@ -86,6 +87,8 @@ func ServeQR(ctx context.Context, client *Client, addr string) error {
 
 	connectErr := client.ConnectWithQR(ctx, qrChan)
 
+	// Keep serving briefly so the browser can poll and see the authenticated state.
+	time.Sleep(5 * time.Second)
 	server.Shutdown(context.Background())
 
 	select {
