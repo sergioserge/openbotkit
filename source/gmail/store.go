@@ -1,6 +1,7 @@
 package gmail
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -66,7 +67,7 @@ func SaveEmail(db *store.DB, email *Email) (int64, error) {
 // ListEmails queries stored emails with optional filters.
 func ListEmails(db *store.DB, opts ListOptions) ([]Email, error) {
 	var conditions []string
-	var args []interface{}
+	var args []any
 
 	if opts.Account != "" {
 		conditions = append(conditions, "account = ?")
@@ -110,7 +111,7 @@ func ListEmails(db *store.DB, opts ListOptions) ([]Email, error) {
 	}
 	defer rows.Close()
 
-	var emails []Email
+	emails := []Email{}
 	for rows.Next() {
 		var e Email
 		var id int64
@@ -176,7 +177,7 @@ func SearchEmails(db *store.DB, query string, limit int) ([]Email, error) {
 	}
 	defer rows.Close()
 
-	var emails []Email
+	emails := []Email{}
 	for rows.Next() {
 		var e Email
 		var id int64
@@ -191,7 +192,7 @@ func SearchEmails(db *store.DB, query string, limit int) ([]Email, error) {
 // CountEmails returns the total number of stored emails, optionally filtered by account.
 func CountEmails(db *store.DB, account string) (int64, error) {
 	query := "SELECT COUNT(*) FROM gmail_emails"
-	var args []interface{}
+	var args []any
 	if account != "" {
 		query += " WHERE account = ?"
 		args = append(args, account)
@@ -204,15 +205,25 @@ func CountEmails(db *store.DB, account string) (int64, error) {
 
 // LastSyncTime returns the most recent fetched_at time from gmail_emails.
 func LastSyncTime(db *store.DB) (*time.Time, error) {
-	var t time.Time
-	err := db.QueryRow("SELECT MAX(fetched_at) FROM gmail_emails").Scan(&t)
+	var raw sql.NullString
+	err := db.QueryRow("SELECT MAX(fetched_at) FROM gmail_emails").Scan(&raw)
 	if err != nil {
 		return nil, err
 	}
-	if t.IsZero() {
+	if !raw.Valid || raw.String == "" {
 		return nil, nil
 	}
-	return &t, nil
+	// SQLite stores timestamps as strings; try common formats.
+	for _, fmt := range []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05Z",
+		time.RFC3339,
+	} {
+		if t, err := time.Parse(fmt, raw.String); err == nil {
+			return &t, nil
+		}
+	}
+	return nil, nil
 }
 
 // AttachmentRow holds attachment metadata from a query.
@@ -228,7 +239,7 @@ func ListAttachments(db *store.DB, emailMessageID string) ([]AttachmentRow, erro
 	query := `SELECT e.message_id, a.filename, a.mime_type, a.saved_path
 		FROM gmail_attachments a
 		JOIN gmail_emails e ON e.id = a.email_id`
-	var args []interface{}
+	var args []any
 	if emailMessageID != "" {
 		query += " WHERE e.message_id = ?"
 		args = append(args, emailMessageID)
@@ -241,7 +252,7 @@ func ListAttachments(db *store.DB, emailMessageID string) ([]AttachmentRow, erro
 	}
 	defer rows.Close()
 
-	var results []AttachmentRow
+	results := []AttachmentRow{}
 	for rows.Next() {
 		var r AttachmentRow
 		if err := rows.Scan(&r.EmailMessageID, &r.Filename, &r.MimeType, &r.SavedPath); err != nil {
