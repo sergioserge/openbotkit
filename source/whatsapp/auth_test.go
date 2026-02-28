@@ -27,8 +27,8 @@ func TestAuthPageServesHTML(t *testing.T) {
 		t.Fatalf("expected text/html, got %q", ct)
 	}
 	body := w.Body.String()
-	if !strings.Contains(body, "WhatsApp Login") {
-		t.Fatal("expected page to contain 'WhatsApp Login'")
+	if !strings.Contains(body, "Link your WhatsApp") {
+		t.Fatal("expected page to contain 'Link your WhatsApp'")
 	}
 	if !strings.Contains(body, "qrcodejs") {
 		t.Fatal("expected page to reference qrcodejs CDN")
@@ -109,13 +109,27 @@ func TestQREndpointAuthenticated(t *testing.T) {
 }
 
 func TestAuthPageContainsQRPolling(t *testing.T) {
-	if !strings.Contains(authPage, "setTimeout(poll,hasQR?2000:5000)") {
-		t.Fatal("expected page to poll every 2 seconds after QR is shown")
+	if !strings.Contains(authPage, "setTimeout(poll,hasQR?2000:3000)") {
+		t.Fatal("expected page to poll every 2-3 seconds")
 	}
 }
 
 func TestAuthPageContainsSuccessMessage(t *testing.T) {
-	if !strings.Contains(authPage, "Authenticated! You can close this tab.") {
+	if !strings.Contains(authPage, "WhatsApp linked successfully!") {
 		t.Fatal("expected page to show success message after authentication")
+	}
+}
+
+func TestAuthPageContainsInstructions(t *testing.T) {
+	instructions := []string{
+		"Open <strong>WhatsApp</strong>",
+		"Linked Devices",
+		"Link a Device",
+		"Point your camera",
+	}
+	for _, s := range instructions {
+		if !strings.Contains(authPage, s) {
+			t.Fatalf("expected page to contain instruction %q", s)
+		}
 	}
 }
