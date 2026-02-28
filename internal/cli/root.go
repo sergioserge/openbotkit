@@ -40,6 +40,8 @@ var versionCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(authcli.Cmd)
+	rootCmd.AddCommand(daemonCmd)
+	rootCmd.AddCommand(serviceCmd)
 	rootCmd.AddCommand(gmail.Cmd)
 	rootCmd.AddCommand(memorycli.Cmd)
 	rootCmd.AddCommand(whatsappcli.Cmd)

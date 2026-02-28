@@ -46,3 +46,7 @@ func ProviderDir(providerName string) string {
 func EnsureProviderDir(providerName string) error {
 	return os.MkdirAll(ProviderDir(providerName), 0700)
 }
+
+func JobsDBPath() string {
+	return filepath.Join(Dir(), "jobs.db")
+}
