@@ -182,7 +182,7 @@ func googleInteractiveRun(cmd *cobra.Command, args []string) error {
 }
 
 func googleInteractiveNewAccount(ctx context.Context, gp *google.Google) error {
-	fmt.Println("\n  No Google accounts connected.\n")
+	fmt.Print("\n  No Google accounts connected.\n\n")
 
 	var selectedScopes []string
 	options := make([]huh.Option[string], len(availableScopeChoices))

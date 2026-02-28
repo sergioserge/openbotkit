@@ -21,7 +21,7 @@ var setupCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("\n  Welcome to OpenBotKit setup!\n")
+		fmt.Print("\n  Welcome to OpenBotKit setup!\n\n")
 
 		// Step 1: Source selection.
 		var sources []string
