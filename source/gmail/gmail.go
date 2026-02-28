@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/priyanshujain/openbotkit/source"
 	"github.com/priyanshujain/openbotkit/store"
@@ -42,6 +43,15 @@ func (g *Gmail) Status(ctx context.Context, db *store.DB) (*source.Status, error
 func (g *Gmail) Sync(ctx context.Context, db *store.DB, opts SyncOptions) (*SyncResult, error) {
 	if err := Migrate(db); err != nil {
 		return nil, fmt.Errorf("migrate schema: %w", err)
+	}
+
+	// Default to 7-day window unless full sync or explicit date.
+	if opts.After == "" && !opts.Full {
+		days := opts.DaysWindow
+		if days == 0 {
+			days = 7
+		}
+		opts.After = time.Now().AddDate(0, 0, -days).Format("2006/01/02")
 	}
 
 	accounts, err := g.cfg.Provider.Accounts(ctx)

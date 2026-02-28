@@ -42,6 +42,7 @@ type SyncOptions struct {
 	Account             string
 	DownloadAttachments bool
 	AttachmentsDir      string
+	DaysWindow          int // default sync window in days (0 = no limit)
 }
 
 type SyncResult struct {
@@ -61,7 +62,8 @@ type ListOptions struct {
 }
 
 type FetchQuery struct {
-	From  string
-	After string
-	Query string // raw Gmail query (takes precedence over From/After)
+	From   string
+	After  string
+	Before string
+	Query  string // raw Gmail query (takes precedence over From/After/Before)
 }
