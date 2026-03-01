@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"go.mau.fi/whatsmeow/types/events"
 )
 
 const authPage = `<!DOCTYPE html>
@@ -177,14 +179,30 @@ func ServeQR(ctx context.Context, client *Client, addr string) error {
 	port := ln.Addr().(*net.TCPAddr).Port
 	fmt.Printf("Open http://localhost:%d in your browser to scan the QR code\n", port)
 
+	syncSignal := make(chan struct{}, 1)
+	handlerID := client.WM().AddEventHandler(func(rawEvt any) {
+		if _, ok := rawEvt.(*events.HistorySync); ok {
+			select {
+			case syncSignal <- struct{}{}:
+			default:
+			}
+		}
+	})
+
 	connectErr := client.ConnectWithQR(ctx, qrChan)
 
-	// Keep the client connected so the phone can finish the initial key exchange.
-	// WhatsApp needs ~10-15s after QR scan to complete device linking.
-	fmt.Println("Completing device linking, please wait...")
-	time.Sleep(15 * time.Second)
+	// Transition from linking → syncing and wait for initial history sync.
+	mu.Lock()
+	linking = false
+	syncing = true
+	mu.Unlock()
+
+	fmt.Println("Syncing message history, please wait...")
+	waitForHistorySync(syncSignal, 45*time.Second, 10*time.Second)
+	client.WM().RemoveEventHandler(handlerID)
 
 	mu.Lock()
+	syncing = false
 	authenticated = true
 	mu.Unlock()
 
