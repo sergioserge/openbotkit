@@ -3,6 +3,7 @@ package whatsapp
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/priyanshujain/openbotkit/source"
@@ -65,22 +66,30 @@ func (w *WhatsApp) Logout(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create client: %w", err)
 	}
-	defer client.Disconnect()
 
 	if !client.IsAuthenticated() {
+		client.Close()
 		return fmt.Errorf("not authenticated")
 	}
 
 	if err := client.Connect(ctx); err != nil {
+		client.Close()
 		return fmt.Errorf("connect: %w", err)
 	}
 
 	if err := client.WM().Logout(ctx); err != nil {
+		client.Close()
 		return err
 	}
 
 	// Give WhatsApp time to process the unlink before disconnecting.
 	time.Sleep(3 * time.Second)
+	client.Close()
+
+	// Remove the session DB and WAL/SHM files so no stale state remains.
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		os.Remove(w.cfg.SessionDBPath + suffix)
+	}
 	return nil
 }
 
