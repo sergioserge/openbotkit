@@ -1,3 +1,7 @@
+## Git Branch Rules
+
+  - No slashes in branch names (e.g., use `fix-something` not `fix/something`).
+
 ## Git Commit Rules
 
   - Commit after every small, atomic change. Each commit should touch 1-3 files max.
