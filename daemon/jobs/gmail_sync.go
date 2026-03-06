@@ -8,6 +8,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/priyanshujain/openbotkit/config"
+
 	"github.com/priyanshujain/openbotkit/provider/google"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	"github.com/priyanshujain/openbotkit/store"
@@ -23,8 +24,8 @@ type GmailSyncWorker struct {
 }
 
 func (w *GmailSyncWorker) Work(ctx context.Context, job *river.Job[GmailSyncArgs]) error {
-	if !w.Cfg.Gmail.Enabled {
-		log.Println("gmail: not enabled, skipping sync")
+	if !config.IsSourceLinked("gmail") {
+		log.Println("gmail: not linked, skipping sync")
 		return nil
 	}
 

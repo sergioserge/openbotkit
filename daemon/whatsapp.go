@@ -17,8 +17,8 @@ func runWhatsAppSync(ctx context.Context, cfg *config.Config) <-chan error {
 	go func() {
 		defer close(errCh)
 
-		if !cfg.WhatsApp.Enabled {
-			log.Println("whatsapp: not enabled, skipping sync")
+		if !config.IsSourceLinked("whatsapp") {
+			log.Println("whatsapp: not linked, skipping sync")
 			return
 		}
 
