@@ -224,7 +224,9 @@ func resolveGWSSkills(cfg *config.Config) (map[string]SkillEntry, []string, erro
 	var skipped []string
 
 	// Always generate shared skills when gws is active.
-	services := append(cfg.Integrations.GWS.Services, "shared")
+	services := make([]string, len(cfg.Integrations.GWS.Services)+1)
+	copy(services, cfg.Integrations.GWS.Services)
+	services[len(services)-1] = "shared"
 
 	tmpDir, err := os.MkdirTemp("", "gws-skills-*")
 	if err != nil {
@@ -278,8 +280,12 @@ func resolveGWSSkills(cfg *config.Config) (map[string]SkillEntry, []string, erro
 
 		// Copy to skills dir.
 		destDir := filepath.Join(SkillsDir(), name)
-		os.MkdirAll(destDir, 0700)
-		os.WriteFile(filepath.Join(destDir, "SKILL.md"), content, 0600)
+		if err := os.MkdirAll(destDir, 0700); err != nil {
+			return nil, nil, fmt.Errorf("create skill dir %s: %w", name, err)
+		}
+		if err := os.WriteFile(filepath.Join(destDir, "SKILL.md"), content, 0600); err != nil {
+			return nil, nil, fmt.Errorf("write skill %s: %w", name, err)
+		}
 	}
 
 	return desired, skipped, nil
