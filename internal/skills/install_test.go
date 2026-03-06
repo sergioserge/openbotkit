@@ -104,6 +104,59 @@ func TestIsSkillEligible(t *testing.T) {
 	}
 }
 
+func TestParseScopeMap(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   map[string]string
+	}{
+		{
+			name:   "one scope per line",
+			output: "https://www.googleapis.com/auth/calendar\nhttps://www.googleapis.com/auth/drive.readonly\n",
+			want:   map[string]string{"calendar": "readwrite", "drive": "readonly"},
+		},
+		{
+			name:   "comma separated on one line",
+			output: `"scopes": "https://www.googleapis.com/auth/calendar.readonly, https://www.googleapis.com/auth/drive"`,
+			want:   map[string]string{"calendar": "readonly", "drive": "readwrite"},
+		},
+		{
+			name:   "readonly not overwritten by broad match",
+			output: "https://www.googleapis.com/auth/calendar.readonly",
+			want:   map[string]string{"calendar": "readonly"},
+		},
+		{
+			name:   "readwrite when no readonly present",
+			output: "https://www.googleapis.com/auth/calendar",
+			want:   map[string]string{"calendar": "readwrite"},
+		},
+		{
+			name:   "empty output",
+			output: "",
+			want:   map[string]string{},
+		},
+		{
+			name:   "multiple services mixed",
+			output: "googleapis.com/auth/calendar.readonly\ngoogleapis.com/auth/tasks\ngoogleapis.com/auth/spreadsheets.readonly",
+			want:   map[string]string{"calendar": "readonly", "tasks": "readwrite", "sheets": "readonly"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseScopeMap(tt.output)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d entries, want %d: %v", len(got), len(tt.want), got)
+			}
+			for k, v := range tt.want {
+				if got[k] != v {
+					t.Errorf("scope %q: got %q, want %q", k, got[k], v)
+				}
+			}
+		})
+	}
+}
+
 func TestGWSServiceFromSkillName(t *testing.T) {
 	tests := []struct {
 		name string
