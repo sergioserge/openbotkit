@@ -291,48 +291,51 @@ func resolveGWSSkills(cfg *config.Config) (map[string]SkillEntry, []string, erro
 	return desired, skipped, nil
 }
 
+// scopeMapping maps Google API scope suffixes to service names.
+// Order matters: .readonly must come before the broader scope so that
+// if only .readonly is present we don't misclassify as readwrite.
+var scopeMapping = []struct {
+	suffix  string
+	service string
+	access  string
+}{
+	{"googleapis.com/auth/calendar.readonly", "calendar", "readonly"},
+	{"googleapis.com/auth/calendar", "calendar", "readwrite"},
+	{"googleapis.com/auth/drive.readonly", "drive", "readonly"},
+	{"googleapis.com/auth/drive", "drive", "readwrite"},
+	{"googleapis.com/auth/tasks.readonly", "tasks", "readonly"},
+	{"googleapis.com/auth/tasks", "tasks", "readwrite"},
+	{"googleapis.com/auth/documents.readonly", "docs", "readonly"},
+	{"googleapis.com/auth/documents", "docs", "readwrite"},
+	{"googleapis.com/auth/spreadsheets.readonly", "sheets", "readonly"},
+	{"googleapis.com/auth/spreadsheets", "sheets", "readwrite"},
+	{"googleapis.com/auth/contacts.readonly", "people", "readonly"},
+	{"googleapis.com/auth/contacts", "people", "readwrite"},
+}
+
 func gwsAuthStatus(gwsPath string) (map[string]string, error) {
 	cmd := exec.Command(gwsPath, "auth", "status", "--json")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("run gws auth status: %w", err)
 	}
+	return parseScopeMap(string(out)), nil
+}
 
-	// Parse scopes from output. Expected format contains scope URLs.
+// parseScopeMap extracts service:access pairs from gws auth status output.
+// Handles both one-scope-per-line and comma/space-separated formats.
+func parseScopeMap(output string) map[string]string {
 	scopeMap := make(map[string]string)
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		// Map full scope URLs to service:access pairs.
-		switch {
-		case strings.Contains(line, "googleapis.com/auth/calendar.readonly"):
-			scopeMap["calendar"] = "readonly"
-		case strings.Contains(line, "googleapis.com/auth/calendar"):
-			scopeMap["calendar"] = "readwrite"
-		case strings.Contains(line, "googleapis.com/auth/drive.readonly"):
-			scopeMap["drive"] = "readonly"
-		case strings.Contains(line, "googleapis.com/auth/drive"):
-			scopeMap["drive"] = "readwrite"
-		case strings.Contains(line, "googleapis.com/auth/tasks.readonly"):
-			scopeMap["tasks"] = "readonly"
-		case strings.Contains(line, "googleapis.com/auth/tasks"):
-			scopeMap["tasks"] = "readwrite"
-		case strings.Contains(line, "googleapis.com/auth/documents.readonly"):
-			scopeMap["docs"] = "readonly"
-		case strings.Contains(line, "googleapis.com/auth/documents"):
-			scopeMap["docs"] = "readwrite"
-		case strings.Contains(line, "googleapis.com/auth/spreadsheets.readonly"):
-			scopeMap["sheets"] = "readonly"
-		case strings.Contains(line, "googleapis.com/auth/spreadsheets"):
-			scopeMap["sheets"] = "readwrite"
-		case strings.Contains(line, "googleapis.com/auth/contacts.readonly"):
-			scopeMap["people"] = "readonly"
-		case strings.Contains(line, "googleapis.com/auth/contacts"):
-			scopeMap["people"] = "readwrite"
+	for _, m := range scopeMapping {
+		if strings.Contains(output, m.suffix) {
+			// Only set if not already set (readonly is checked before
+			// readwrite, so if .readonly matched, don't overwrite).
+			if _, exists := scopeMap[m.service]; !exists {
+				scopeMap[m.service] = m.access
+			}
 		}
 	}
-
-	return scopeMap, nil
+	return scopeMap
 }
 
 func gwsGenerateSkills(gwsPath, outputDir, filter string) error {
