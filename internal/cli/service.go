@@ -13,14 +13,14 @@ import (
 	"github.com/priyanshujain/openbotkit/daemon/service"
 )
 
-var daemonCmd = &cobra.Command{
-	Use:   "daemon",
-	Short: "Manage the obk background daemon",
+var serviceCmd = &cobra.Command{
+	Use:   "service",
+	Short: "Manage the obk background service",
 }
 
-var daemonRunCmd = &cobra.Command{
+var serviceRunCmd = &cobra.Command{
 	Use:    "run",
-	Short:  "Run the daemon process (used internally by the system service)",
+	Short:  "Run the service process (used internally by the system service)",
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
@@ -41,7 +41,7 @@ var daemonRunCmd = &cobra.Command{
 	},
 }
 
-var daemonInstallCmd = &cobra.Command{
+var serviceInstallCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install obk as a system service",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -59,12 +59,12 @@ var daemonInstallCmd = &cobra.Command{
 			return fmt.Errorf("install service: %w", err)
 		}
 
-		fmt.Printf("daemon installed (platform: %s)\n", service.DetectPlatform())
+		fmt.Printf("service installed (platform: %s)\n", service.DetectPlatform())
 		return nil
 	},
 }
 
-var daemonUninstallCmd = &cobra.Command{
+var serviceUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "Uninstall the obk system service",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -77,14 +77,14 @@ var daemonUninstallCmd = &cobra.Command{
 			return fmt.Errorf("uninstall service: %w", err)
 		}
 
-		fmt.Println("daemon uninstalled")
+		fmt.Println("service uninstalled")
 		return nil
 	},
 }
 
-var daemonStatusCmd = &cobra.Command{
+var serviceStatusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Check the daemon status",
+	Short: "Check the service status",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mgr, err := service.NewManager()
 		if err != nil {
@@ -96,14 +96,14 @@ var daemonStatusCmd = &cobra.Command{
 			return fmt.Errorf("check status: %w", err)
 		}
 
-		fmt.Printf("daemon: %s\n", status)
+		fmt.Printf("service: %s\n", status)
 		return nil
 	},
 }
 
 func init() {
-	daemonCmd.AddCommand(daemonRunCmd)
-	daemonCmd.AddCommand(daemonInstallCmd)
-	daemonCmd.AddCommand(daemonUninstallCmd)
-	daemonCmd.AddCommand(daemonStatusCmd)
+	serviceCmd.AddCommand(serviceRunCmd)
+	serviceCmd.AddCommand(serviceInstallCmd)
+	serviceCmd.AddCommand(serviceUninstallCmd)
+	serviceCmd.AddCommand(serviceStatusCmd)
 }
