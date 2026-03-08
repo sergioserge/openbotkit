@@ -9,6 +9,10 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 
 	"github.com/priyanshujain/openbotkit/provider"
 )
@@ -16,10 +20,17 @@ import (
 const defaultBaseURL = "https://generativelanguage.googleapis.com"
 
 // Gemini implements provider.Provider using the Google Gemini API.
+// It supports both the direct Gemini API and Google Vertex AI.
 type Gemini struct {
 	apiKey  string
 	baseURL string
 	client  *http.Client
+
+	// Vertex AI fields.
+	vertexProject string
+	vertexRegion  string
+	tokenOnce     sync.Once
+	tokenSource   oauth2.TokenSource
 }
 
 var _ provider.Provider = (*Gemini)(nil)
@@ -33,6 +44,41 @@ func WithBaseURL(url string) Option {
 
 func WithHTTPClient(c *http.Client) Option {
 	return func(g *Gemini) { g.client = c }
+}
+
+// WithVertexAI configures the provider to use Google Vertex AI.
+// Uses Google Application Default Credentials unless a custom TokenSource is provided via WithTokenSource.
+func WithVertexAI(project, region string) Option {
+	return func(g *Gemini) {
+		g.vertexProject = project
+		g.vertexRegion = region
+	}
+}
+
+// WithTokenSource sets a custom OAuth2 token source for Vertex AI authentication.
+func WithTokenSource(ts oauth2.TokenSource) Option {
+	return func(g *Gemini) { g.tokenSource = ts }
+}
+
+func (g *Gemini) isVertexAI() bool {
+	return g.vertexProject != ""
+}
+
+func (g *Gemini) vertexToken(ctx context.Context) (string, error) {
+	if g.tokenSource == nil {
+		var initErr error
+		g.tokenOnce.Do(func() {
+			g.tokenSource, initErr = google.DefaultTokenSource(ctx, "https://www.googleapis.com/auth/cloud-platform")
+		})
+		if initErr != nil {
+			return "", fmt.Errorf("get google credentials: %w", initErr)
+		}
+	}
+	token, err := g.tokenSource.Token()
+	if err != nil {
+		return "", fmt.Errorf("get access token: %w", err)
+	}
+	return token.AccessToken, nil
 }
 
 func New(apiKey string, opts ...Option) *Gemini {
@@ -61,7 +107,10 @@ func init() {
 func (g *Gemini) Chat(ctx context.Context, req provider.ChatRequest) (*provider.ChatResponse, error) {
 	body := g.buildRequest(req)
 
-	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", g.baseURL, req.Model, g.apiKey)
+	url, err := g.chatURL(ctx, req.Model, false)
+	if err != nil {
+		return nil, err
+	}
 	respBody, err := g.doRequest(ctx, url, body)
 	if err != nil {
 		return nil, err
@@ -84,7 +133,10 @@ func (g *Gemini) Chat(ctx context.Context, req provider.ChatRequest) (*provider.
 func (g *Gemini) StreamChat(ctx context.Context, req provider.ChatRequest) (<-chan provider.StreamEvent, error) {
 	body := g.buildRequest(req)
 
-	url := fmt.Sprintf("%s/v1beta/models/%s:streamGenerateContent?alt=sse&key=%s", g.baseURL, req.Model, g.apiKey)
+	url, err := g.chatURL(ctx, req.Model, true)
+	if err != nil {
+		return nil, err
+	}
 	respBody, err := g.doRequest(ctx, url, body)
 	if err != nil {
 		return nil, err
@@ -93,6 +145,25 @@ func (g *Gemini) StreamChat(ctx context.Context, req provider.ChatRequest) (<-ch
 	ch := make(chan provider.StreamEvent, 64)
 	go g.parseSSE(respBody, ch)
 	return ch, nil
+}
+
+// chatURL returns the endpoint URL, handling both direct API and Vertex AI.
+func (g *Gemini) chatURL(ctx context.Context, model string, stream bool) (string, error) {
+	if g.isVertexAI() {
+		action := "generateContent"
+		suffix := ""
+		if stream {
+			action = "streamGenerateContent"
+			suffix = "?alt=sse"
+		}
+		return fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:%s%s",
+			g.vertexRegion, g.vertexProject, g.vertexRegion, model, action, suffix), nil
+	}
+
+	if stream {
+		return fmt.Sprintf("%s/v1beta/models/%s:streamGenerateContent?alt=sse&key=%s", g.baseURL, model, g.apiKey), nil
+	}
+	return fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", g.baseURL, model, g.apiKey), nil
 }
 
 func (g *Gemini) buildRequest(req provider.ChatRequest) map[string]any {
@@ -196,6 +267,14 @@ func (g *Gemini) doRequest(ctx context.Context, url string, body map[string]any)
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+
+	if g.isVertexAI() {
+		token, err := g.vertexToken(ctx)
+		if err != nil {
+			return nil, err
+		}
+		httpReq.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := g.client.Do(httpReq)
 	if err != nil {
