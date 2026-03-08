@@ -30,7 +30,8 @@ var chatCmd = &cobra.Command{
 		}
 
 		if err := cfg.RequireSetup(); err != nil {
-			return err
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 
 		registry, err := provider.NewRegistry(cfg.Models)

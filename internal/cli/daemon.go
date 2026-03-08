@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"os/signal"
 	"syscall"
 
@@ -28,7 +29,8 @@ var daemonRunCmd = &cobra.Command{
 		}
 
 		if err := cfg.RequireSetup(); err != nil {
-			return err
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 
 		ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
