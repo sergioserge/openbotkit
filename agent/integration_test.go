@@ -16,6 +16,7 @@ import (
 	"github.com/priyanshujain/openbotkit/agent/tools"
 	"github.com/priyanshujain/openbotkit/provider"
 	"github.com/priyanshujain/openbotkit/provider/anthropic"
+	"github.com/priyanshujain/openbotkit/provider/gemini"
 	"github.com/priyanshujain/openbotkit/provider/openai"
 )
 
@@ -78,9 +79,16 @@ func availableProviders(t *testing.T) []providerTestCase {
 			model:    "gpt-4o-mini",
 		})
 	}
+	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
+		providers = append(providers, providerTestCase{
+			name:     "gemini",
+			provider: gemini.New(key),
+			model:    "gemini-2.0-flash",
+		})
+	}
 
 	if len(providers) == 0 {
-		t.Skip("no API keys set (ANTHROPIC_API_KEY, OPENAI_API_KEY) — skipping integration tests")
+		t.Skip("no API keys set (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY) — skipping integration tests")
 	}
 	return providers
 }
