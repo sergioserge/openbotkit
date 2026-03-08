@@ -29,8 +29,12 @@ type ModelsConfig struct {
 
 // ModelProviderConfig holds settings for a single LLM provider.
 type ModelProviderConfig struct {
-	APIKeyRef string `yaml:"api_key_ref,omitempty"` // e.g. "keychain:obk/anthropic"
-	BaseURL   string `yaml:"base_url,omitempty"`
+	APIKeyRef     string `yaml:"api_key_ref,omitempty"`     // e.g. "keychain:obk/anthropic"
+	BaseURL       string `yaml:"base_url,omitempty"`
+	AuthMethod    string `yaml:"auth_method,omitempty"`     // "api_key" or "vertex_ai"
+	VertexProject string `yaml:"vertex_project,omitempty"`
+	VertexRegion  string `yaml:"vertex_region,omitempty"`
+	VertexAccount string `yaml:"vertex_account,omitempty"`  // gcloud account email
 }
 
 type IntegrationsConfig struct {
@@ -76,6 +80,14 @@ type AppleNotesConfig struct {
 type StorageConfig struct {
 	Driver string `yaml:"driver,omitempty"` // "sqlite" or "postgres"
 	DSN    string `yaml:"dsn,omitempty"`
+}
+
+// RequireSetup returns an error if LLM models have not been configured.
+func (c *Config) RequireSetup() error {
+	if c.Models == nil || c.Models.Default == "" {
+		return fmt.Errorf("setup not complete — please run 'obk setup' and configure LLM models before using this command")
+	}
+	return nil
 }
 
 func Load() (*Config, error) {

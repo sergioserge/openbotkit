@@ -89,6 +89,29 @@ func TestLoadFromMissingFile(t *testing.T) {
 	}
 }
 
+func TestRequireSetup_NoModels(t *testing.T) {
+	cfg := Default()
+	if err := cfg.RequireSetup(); err == nil {
+		t.Fatal("expected error when models not configured")
+	}
+}
+
+func TestRequireSetup_NoDefault(t *testing.T) {
+	cfg := Default()
+	cfg.Models = &ModelsConfig{}
+	if err := cfg.RequireSetup(); err == nil {
+		t.Fatal("expected error when default model not set")
+	}
+}
+
+func TestRequireSetup_OK(t *testing.T) {
+	cfg := Default()
+	cfg.Models = &ModelsConfig{Default: "anthropic/claude-sonnet-4-6"}
+	if err := cfg.RequireSetup(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSaveAndLoad(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.yaml")
