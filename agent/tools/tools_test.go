@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/priyanshujain/openbotkit/provider"
 )
 
 func TestRegistryProviderTools(t *testing.T) {
@@ -115,6 +117,55 @@ func TestFileEdit(t *testing.T) {
 		t.Errorf("content = %q", string(got))
 	}
 }
+
+func TestRegistryTruncatesLargeOutput(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&stubTool{
+		name:   "big",
+		output: strings.Repeat("x", 600_000), // ~600KB
+	})
+
+	output, err := r.Execute(context.Background(), provider.ToolCall{
+		Name:  "big",
+		Input: json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if len(output) >= 600_000 {
+		t.Errorf("output not truncated: len=%d", len(output))
+	}
+	if !strings.Contains(output, "output truncated") {
+		t.Errorf("missing truncation notice")
+	}
+}
+
+func TestRegistrySmallOutputUnchanged(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&stubTool{name: "small", output: "hello"})
+
+	output, err := r.Execute(context.Background(), provider.ToolCall{
+		Name:  "small",
+		Input: json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if output != "hello" {
+		t.Errorf("output = %q, want %q", output, "hello")
+	}
+}
+
+// stubTool is a minimal tool for testing the registry.
+type stubTool struct {
+	name   string
+	output string
+}
+
+func (s *stubTool) Name() string                                                     { return s.name }
+func (s *stubTool) Description() string                                              { return "stub" }
+func (s *stubTool) InputSchema() json.RawMessage                                     { return json.RawMessage(`{"type":"object"}`) }
+func (s *stubTool) Execute(_ context.Context, _ json.RawMessage) (string, error) { return s.output, nil }
 
 func TestFileEditNotFound(t *testing.T) {
 	tmp := t.TempDir()
