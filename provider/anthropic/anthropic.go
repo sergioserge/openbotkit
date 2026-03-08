@@ -9,20 +9,32 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 
 	"github.com/priyanshujain/openbotkit/provider"
 )
 
 const (
-	defaultBaseURL = "https://api.anthropic.com"
-	apiVersion     = "2023-06-01"
+	defaultBaseURL  = "https://api.anthropic.com"
+	apiVersion      = "2023-06-01"
+	vertexAPIVersion = "vertex-2023-10-16"
 )
 
 // Anthropic implements the provider.Provider interface using the Anthropic Messages API.
+// It supports both the direct Anthropic API and Google Vertex AI.
 type Anthropic struct {
 	apiKey  string
 	baseURL string
 	client  *http.Client
+
+	// Vertex AI fields.
+	vertexProject string
+	vertexRegion  string
+	tokenOnce     sync.Once
+	tokenSource   oauth2.TokenSource
 }
 
 // Ensure Anthropic implements Provider at compile time.
@@ -49,6 +61,34 @@ func WithBaseURL(url string) Option {
 // WithHTTPClient sets a custom HTTP client.
 func WithHTTPClient(c *http.Client) Option {
 	return func(a *Anthropic) { a.client = c }
+}
+
+// WithVertexAI configures the provider to use Google Vertex AI instead of the direct Anthropic API.
+// Requires Google Application Default Credentials (run: gcloud auth application-default login).
+func WithVertexAI(project, region string) Option {
+	return func(a *Anthropic) {
+		a.vertexProject = project
+		a.vertexRegion = region
+	}
+}
+
+func (a *Anthropic) isVertexAI() bool {
+	return a.vertexProject != ""
+}
+
+func (a *Anthropic) vertexToken(ctx context.Context) (string, error) {
+	var initErr error
+	a.tokenOnce.Do(func() {
+		a.tokenSource, initErr = google.DefaultTokenSource(ctx, "https://www.googleapis.com/auth/cloud-platform")
+	})
+	if initErr != nil {
+		return "", fmt.Errorf("get google credentials: %w", initErr)
+	}
+	token, err := a.tokenSource.Token()
+	if err != nil {
+		return "", fmt.Errorf("get access token: %w", err)
+	}
+	return token.AccessToken, nil
 }
 
 // New creates a new Anthropic provider.
@@ -186,18 +226,47 @@ func convertMessage(m provider.Message) map[string]any {
 }
 
 func (a *Anthropic) doRequest(ctx context.Context, body map[string]any) (io.ReadCloser, error) {
+	var url string
+	var bearerToken string
+
+	if a.isVertexAI() {
+		model, _ := body["model"].(string)
+		delete(body, "model")
+		body["anthropic_version"] = vertexAPIVersion
+
+		endpoint := "rawPredict"
+		if _, ok := body["stream"]; ok {
+			endpoint = "streamRawPredict"
+		}
+		url = fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/anthropic/models/%s:%s",
+			a.vertexRegion, a.vertexProject, a.vertexRegion, model, endpoint)
+
+		var err error
+		bearerToken, err = a.vertexToken(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		url = a.baseURL + "/v1/messages"
+	}
+
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", a.baseURL+"/v1/messages", bytes.NewReader(jsonBody))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-api-key", a.apiKey)
-	httpReq.Header.Set("anthropic-version", apiVersion)
+
+	if a.isVertexAI() {
+		httpReq.Header.Set("Authorization", "Bearer "+bearerToken)
+	} else {
+		httpReq.Header.Set("x-api-key", a.apiKey)
+		httpReq.Header.Set("anthropic-version", apiVersion)
+	}
 
 	resp, err := a.client.Do(httpReq)
 	if err != nil {
