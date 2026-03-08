@@ -5,6 +5,15 @@ import (
 	"testing"
 )
 
+func TestAPIError_Error(t *testing.T) {
+	e := &APIError{StatusCode: 429, Kind: ErrorRetryable, Message: "rate limit"}
+	got := e.Error()
+	want := "API error (HTTP 429): rate limit"
+	if got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
+}
+
 func TestClassifyError(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -53,6 +62,36 @@ func TestClassifyError(t *testing.T) {
 			err:        fmt.Errorf("API error (HTTP 400): invalid request"),
 			wantKind:   ErrorPermanent,
 			wantStatus: 400,
+		},
+		{
+			name:       "502 bad gateway",
+			err:        fmt.Errorf("API error (HTTP 502): bad gateway"),
+			wantKind:   ErrorRetryable,
+			wantStatus: 502,
+		},
+		{
+			name:       "404 not found",
+			err:        fmt.Errorf("API error (HTTP 404): not found"),
+			wantKind:   ErrorPermanent,
+			wantStatus: 404,
+		},
+		{
+			name:       "500 with context in message",
+			err:        fmt.Errorf("API error (HTTP 500): internal context error"),
+			wantKind:   ErrorRetryable,
+			wantStatus: 500,
+		},
+		{
+			name:       "400 context uppercase",
+			err:        fmt.Errorf("API error (HTTP 400): CONTEXT window too large"),
+			wantKind:   ErrorContextWindow,
+			wantStatus: 400,
+		},
+		{
+			name:       "multiple status codes picks first",
+			err:        fmt.Errorf("API error (HTTP 429): retry after (HTTP 500)"),
+			wantKind:   ErrorRetryable,
+			wantStatus: 429,
 		},
 		{
 			name:       "no status code",
