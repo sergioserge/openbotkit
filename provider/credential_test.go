@@ -3,6 +3,7 @@ package provider
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -36,25 +37,36 @@ func TestParseCredentialRef(t *testing.T) {
 	}
 }
 
+// setTestHome overrides the home directory to dir for the duration of the test.
+// On Windows os.UserHomeDir reads USERPROFILE; on Unix it reads HOME.
+func setTestHome(t *testing.T, dir string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", dir)
+	} else {
+		t.Setenv("HOME", dir)
+	}
+}
+
 func TestFileCredentialStoreLoad(t *testing.T) {
 	dir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	t.Setenv("HOME", dir)
-	defer os.Setenv("HOME", origHome)
+	setTestHome(t, dir)
 
 	err := storeToFile("obk", "test-provider", "secret-key-123")
 	if err != nil {
 		t.Fatalf("storeToFile: %v", err)
 	}
 
-	// Verify file exists with correct permissions.
+	// Verify file exists with correct permissions (Unix only).
 	path := filepath.Join(dir, ".obk", "secrets", "obk-test-provider")
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat secret file: %v", err)
 	}
-	if perm := info.Mode().Perm(); perm != 0600 {
-		t.Errorf("file permissions = %o, want 0600", perm)
+	if runtime.GOOS != "windows" {
+		if perm := info.Mode().Perm(); perm != 0600 {
+			t.Errorf("file permissions = %o, want 0600", perm)
+		}
 	}
 
 	// Load it back.
@@ -69,7 +81,7 @@ func TestFileCredentialStoreLoad(t *testing.T) {
 
 func TestFileCredentialLoad_NotFound(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", dir)
+	setTestHome(t, dir)
 
 	_, err := loadFromFile("obk", "nonexistent")
 	if err == nil {
