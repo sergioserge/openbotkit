@@ -19,7 +19,7 @@ const (
 	<key>ProgramArguments</key>
 	<array>
 		<string>%s</string>
-		<string>daemon</string>
+		<string>service</string>
 		<string>run</string>
 	</array>
 	<key>RunAtLoad</key>
