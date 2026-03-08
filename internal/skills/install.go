@@ -106,6 +106,11 @@ func Install(cfg *config.Config) (*InstallResult, error) {
 		return nil, fmt.Errorf("save manifest: %w", err)
 	}
 
+	// Regenerate skill index.
+	if err := GenerateIndex(); err != nil {
+		return nil, fmt.Errorf("generate index: %w", err)
+	}
+
 	return result, nil
 }
 
