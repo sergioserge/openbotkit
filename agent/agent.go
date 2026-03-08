@@ -19,9 +19,10 @@ type Agent struct {
 	model      string
 	system     string
 	executor   ToolExecutor
-	history    []provider.Message
-	maxIter    int
-	maxHistory int
+	history     []provider.Message
+	maxIter     int
+	maxHistory  int
+	rateLimiter *provider.RateLimiter
 }
 
 // Option configures an Agent.
@@ -40,6 +41,11 @@ func WithMaxIterations(n int) Option {
 // WithMaxHistory sets the maximum number of history messages before compaction.
 func WithMaxHistory(n int) Option {
 	return func(a *Agent) { a.maxHistory = n }
+}
+
+// WithRateLimit sets a rate limit on LLM API calls (requests per hour).
+func WithRateLimit(requestsPerHour int) Option {
+	return func(a *Agent) { a.rateLimiter = provider.NewRateLimiter(requestsPerHour) }
 }
 
 // New creates a new Agent.
@@ -64,6 +70,11 @@ func (a *Agent) Run(ctx context.Context, input string) (string, error) {
 
 	for i := range a.maxIter {
 		a.compactHistory()
+		if a.rateLimiter != nil {
+			if err := a.rateLimiter.Wait(ctx); err != nil {
+				return "", fmt.Errorf("rate limiter: %w", err)
+			}
+		}
 		resp, err := a.provider.Chat(ctx, provider.ChatRequest{
 			Model:     a.model,
 			System:    a.system,
