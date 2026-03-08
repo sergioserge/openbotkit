@@ -34,6 +34,21 @@ func availableProviders(t *testing.T) []providerTestCase {
 			model:    "claude-sonnet-4-6",
 		})
 	}
+	if project := os.Getenv("GOOGLE_CLOUD_PROJECT"); project != "" {
+		region := os.Getenv("GOOGLE_CLOUD_REGION")
+		if region == "" {
+			region = "us-east5"
+		}
+		model := os.Getenv("VERTEX_CLAUDE_MODEL")
+		if model == "" {
+			model = "claude-sonnet-4-6@20250514"
+		}
+		providers = append(providers, providerTestCase{
+			name:     "anthropic-vertex",
+			provider: anthropic.New("", anthropic.WithVertexAI(project, region)),
+			model:    model,
+		})
+	}
 	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
 		providers = append(providers, providerTestCase{
 			name:     "openai",

@@ -283,3 +283,35 @@ func TestAnthropicIntegration(t *testing.T) {
 		t.Error("empty response")
 	}
 }
+
+func TestVertexAIIntegration(t *testing.T) {
+	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	if project == "" {
+		t.Skip("GOOGLE_CLOUD_PROJECT not set")
+	}
+	region := os.Getenv("GOOGLE_CLOUD_REGION")
+	if region == "" {
+		region = "us-east5"
+	}
+	model := os.Getenv("VERTEX_CLAUDE_MODEL")
+	if model == "" {
+		model = "claude-sonnet-4-6@20250514"
+	}
+
+	p := New("", WithVertexAI(project, region))
+	resp, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model:     model,
+		Messages:  []provider.Message{provider.NewTextMessage(provider.RoleUser, "Say 'hello' and nothing else.")},
+		MaxTokens: 32,
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	if resp.StopReason != provider.StopEndTurn {
+		t.Errorf("StopReason = %q", resp.StopReason)
+	}
+	if text := resp.TextContent(); text == "" {
+		t.Error("empty response")
+	}
+}
