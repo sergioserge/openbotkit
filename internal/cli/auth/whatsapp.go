@@ -3,8 +3,12 @@ package auth
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"runtime"
+	"strings"
 
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/remote"
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
 	"github.com/spf13/cobra"
 )
@@ -21,6 +25,10 @@ var whatsappLoginCmd = &cobra.Command{
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
+		}
+
+		if cfg.IsRemote() {
+			return whatsappLoginRemote(cfg)
 		}
 
 		if err := config.EnsureSourceDir("whatsapp"); err != nil {
@@ -97,6 +105,25 @@ var whatsappStatusCmd = &cobra.Command{
 		fmt.Printf("Authenticated as %s\n", client.WM().Store.ID.User)
 		return nil
 	},
+}
+
+func whatsappLoginRemote(cfg *config.Config) error {
+	if cfg.Remote == nil || cfg.Remote.Server == "" {
+		return fmt.Errorf("remote server not configured — run 'obk setup' to configure")
+	}
+
+	url := strings.TrimRight(cfg.Remote.Server, "/") + "/auth/whatsapp"
+	fmt.Printf("Open this URL in your browser to authenticate WhatsApp:\n%s\n", url)
+
+	// Try to open the browser automatically.
+	if runtime.GOOS == "darwin" {
+		_ = exec.Command("open", url).Start()
+	}
+
+	// Poll the server until authentication completes.
+	client := remote.NewClient(cfg.Remote.Server, cfg.Remote.Username, cfg.Remote.Password)
+	fmt.Println("\nWaiting for authentication to complete...")
+	return client.WaitWhatsAppAuth()
 }
 
 func init() {
