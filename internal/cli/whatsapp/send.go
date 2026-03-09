@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/priyanshujain/openbotkit/config"
-	"github.com/priyanshujain/openbotkit/remote"
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
@@ -31,7 +30,10 @@ var messagesSendCmd = &cobra.Command{
 		}
 
 		if cfg.IsRemote() {
-			client := remote.NewClient(cfg.Remote.Server, cfg.Remote.Username, cfg.Remote.Password)
+			client, err := newRemoteClient(cfg)
+			if err != nil {
+				return err
+			}
 			result, err := client.WhatsAppSend(to, text)
 			if err != nil {
 				return fmt.Errorf("send message: %w", err)
