@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/priyanshujain/openbotkit/agent"
@@ -42,7 +42,7 @@ func (sm *SessionManager) Run(ctx context.Context) {
 			return
 		}
 		if err != nil {
-			log.Printf("telegram session: receive error: %v", err)
+			slog.Error("telegram session: receive error", "error", err)
 			continue
 		}
 
@@ -53,14 +53,14 @@ func (sm *SessionManager) Run(ctx context.Context) {
 func (sm *SessionManager) handleMessage(ctx context.Context, text string) {
 	a, err := sm.newAgent()
 	if err != nil {
-		log.Printf("telegram session: create agent: %v", err)
+		slog.Error("telegram session: create agent", "error", err)
 		sm.channel.Send(fmt.Sprintf("Error: %v", err))
 		return
 	}
 
 	response, err := a.Run(ctx, text)
 	if err != nil {
-		log.Printf("telegram session: agent error: %v", err)
+		slog.Error("telegram session: agent error", "error", err)
 		sm.channel.Send(fmt.Sprintf("Error: %v", err))
 		return
 	}
@@ -122,28 +122,28 @@ func (sm *SessionManager) saveHistory(userMsg, assistantMsg string) {
 		DSN:    sm.cfg.HistoryDataDSN(),
 	})
 	if err != nil {
-		log.Printf("telegram session: open history db: %v", err)
+		slog.Error("telegram session: open history db", "error", err)
 		return
 	}
 	defer histDB.Close()
 
 	if err := historysrc.Migrate(histDB); err != nil {
-		log.Printf("telegram session: migrate history: %v", err)
+		slog.Error("telegram session: migrate history", "error", err)
 		return
 	}
 
 	sessionID := generateSessionID()
 	convID, err := historysrc.UpsertConversation(histDB, sessionID, "telegram")
 	if err != nil {
-		log.Printf("telegram session: create conversation: %v", err)
+		slog.Error("telegram session: create conversation", "error", err)
 		return
 	}
 
 	if err := historysrc.SaveMessage(histDB, convID, "user", userMsg); err != nil {
-		log.Printf("telegram session: save user message: %v", err)
+		slog.Error("telegram session: save user message", "error", err)
 	}
 	if err := historysrc.SaveMessage(histDB, convID, "assistant", assistantMsg); err != nil {
-		log.Printf("telegram session: save assistant message: %v", err)
+		slog.Error("telegram session: save assistant message", "error", err)
 	}
 }
 

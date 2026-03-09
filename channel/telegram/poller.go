@@ -2,7 +2,7 @@ package telegram
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -51,7 +51,7 @@ func (p *Poller) handleUpdate(update tgbotapi.Update) {
 	}
 
 	if update.Message.From.ID != p.ownerID {
-		log.Printf("telegram: ignoring message from non-owner %d", update.Message.From.ID)
+		slog.Warn("telegram: ignoring message from non-owner", "user_id", update.Message.From.ID)
 		return
 	}
 
