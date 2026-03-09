@@ -115,6 +115,7 @@ func checkDatabases(cfg *config.Config) []checkResult {
 		{"Gmail DB", cfg.GmailDataDSN()},
 		{"WhatsApp DB", cfg.WhatsAppDataDSN()},
 		{"History DB", cfg.HistoryDataDSN()},
+		{"UserMemory DB", cfg.UserMemoryDataDSN()},
 		{"AppleNotes DB", cfg.AppleNotesDataDSN()},
 		{"Jobs DB", cfg.JobsDBDSN()},
 	}
