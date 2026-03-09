@@ -44,10 +44,11 @@ func Get(db *store.DB, id int64) (*Memory, error) {
 	var m Memory
 	var cat, src string
 	var srcRef *string
+	var createdAt, updatedAt string
 	err := db.QueryRow(
 		db.Rebind("SELECT id, content, category, source, source_ref, created_at, updated_at FROM memories WHERE id = ?"),
 		id,
-	).Scan(&m.ID, &m.Content, &cat, &src, &srcRef, &m.CreatedAt, &m.UpdatedAt)
+	).Scan(&m.ID, &m.Content, &cat, &src, &srcRef, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get memory: %w", err)
 	}
@@ -56,6 +57,8 @@ func Get(db *store.DB, id int64) (*Memory, error) {
 	if srcRef != nil {
 		m.SourceRef = *srcRef
 	}
+	m.CreatedAt = parseTime(createdAt)
+	m.UpdatedAt = parseTime(updatedAt)
 	return &m, nil
 }
 
