@@ -8,6 +8,7 @@ import (
 	"github.com/priyanshujain/openbotkit/provider"
 	"github.com/priyanshujain/openbotkit/provider/anthropic"
 	"github.com/priyanshujain/openbotkit/provider/gemini"
+	"github.com/priyanshujain/openbotkit/internal/envload"
 	"github.com/priyanshujain/openbotkit/provider/openai"
 )
 
@@ -19,6 +20,7 @@ type providerTestCase struct {
 
 func availableProviders(t *testing.T) []providerTestCase {
 	t.Helper()
+	envload.Load(t)
 	var providers []providerTestCase
 
 	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {

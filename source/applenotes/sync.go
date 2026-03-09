@@ -2,7 +2,7 @@ package applenotes
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/priyanshujain/openbotkit/store"
 )
@@ -12,25 +12,25 @@ func Sync(db *store.DB, opts SyncOptions) (*SyncResult, error) {
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
 
-	log.Println("applenotes: fetching folders...")
+	slog.Info("applenotes: fetching folders")
 	folders, noteToFolder, err := FetchFolders()
 	if err != nil {
 		return nil, fmt.Errorf("fetch folders: %w", err)
 	}
-	log.Printf("applenotes: found %d folders", len(folders))
+	slog.Info("applenotes: found folders", "count", len(folders))
 
 	for i := range folders {
 		if err := SaveFolder(db, &folders[i]); err != nil {
-			log.Printf("applenotes: save folder %q: %v", folders[i].Name, err)
+			slog.Error("applenotes: save folder", "folder", folders[i].Name, "error", err)
 		}
 	}
 
-	log.Println("applenotes: fetching notes...")
+	slog.Info("applenotes: fetching notes")
 	notes, err := FetchAllNotes()
 	if err != nil {
 		return nil, fmt.Errorf("fetch notes: %w", err)
 	}
-	log.Printf("applenotes: found %d notes", len(notes))
+	slog.Info("applenotes: found notes", "count", len(notes))
 
 	result := &SyncResult{}
 	for i := range notes {
@@ -49,7 +49,7 @@ func Sync(db *store.DB, opts SyncOptions) (*SyncResult, error) {
 		}
 
 		if err := SaveNote(db, n); err != nil {
-			log.Printf("applenotes: save note %q: %v", n.Title, err)
+			slog.Error("applenotes: save note", "title", n.Title, "error", err)
 			result.Errors++
 			continue
 		}

@@ -117,6 +117,30 @@ func waitForHistorySync(syncSignal <-chan struct{}, maxWait, quietPeriod time.Du
 	}
 }
 
+// AuthPage returns the HTML for the WhatsApp QR authentication page.
+func AuthPage() string {
+	return authPage
+}
+
+// WaitForSync blocks until either the quiet period elapses after the
+// last sync signal, or maxWait is reached.
+func WaitForSync(client *Client, maxWaitSec, quietPeriodSec int) {
+	syncSignal := make(chan struct{}, 1)
+	handlerID := client.WM().AddEventHandler(func(rawEvt any) {
+		if _, ok := rawEvt.(*events.HistorySync); ok {
+			select {
+			case syncSignal <- struct{}{}:
+			default:
+			}
+		}
+	})
+	defer client.WM().RemoveEventHandler(handlerID)
+
+	waitForHistorySync(syncSignal,
+		time.Duration(maxWaitSec)*time.Second,
+		time.Duration(quietPeriodSec)*time.Second)
+}
+
 func ServeQR(ctx context.Context, client *Client, addr string) error {
 	if addr == "" {
 		addr = ":8085"

@@ -21,6 +21,28 @@ var syncCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
+		if cfg.IsRemote() {
+			full, _ := cmd.Flags().GetBool("full")
+			after, _ := cmd.Flags().GetString("after")
+			account, _ := cmd.Flags().GetString("account")
+			days, _ := cmd.Flags().GetInt("days")
+
+			client, err := newRemoteClient(cfg)
+			if err != nil {
+				return err
+			}
+			result, err := client.GmailSync(full, after, account, days)
+			if err != nil {
+				return fmt.Errorf("sync failed: %w", err)
+			}
+			fmt.Printf("\nSync complete: %d fetched, %d skipped", result.Fetched, result.Skipped)
+			if result.Errors > 0 {
+				fmt.Printf(", %d errors", result.Errors)
+			}
+			fmt.Println()
+			return nil
+		}
+
 		dsn := cfg.GmailDataDSN()
 		db, err := store.Open(store.Config{
 			Driver: cfg.Gmail.Storage.Driver,

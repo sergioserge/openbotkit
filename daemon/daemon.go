@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/riverqueue/river"
 
@@ -12,13 +12,29 @@ import (
 )
 
 type Daemon struct {
-	cfg   *config.Config
-	river *river.Client[*sql.Tx]
-	jobsDB *sql.DB
+	cfg            *config.Config
+	river          *river.Client[*sql.Tx]
+	jobsDB         *sql.DB
+	skipAppleNotes bool
+	skipWhatsApp   bool
 }
 
-func New(cfg *config.Config) *Daemon {
-	return &Daemon{cfg: cfg}
+type Option func(*Daemon)
+
+func WithSkipAppleNotes() Option {
+	return func(d *Daemon) { d.skipAppleNotes = true }
+}
+
+func WithSkipWhatsApp() Option {
+	return func(d *Daemon) { d.skipWhatsApp = true }
+}
+
+func New(cfg *config.Config, opts ...Option) *Daemon {
+	d := &Daemon{cfg: cfg}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
 }
 
 func (d *Daemon) Run(ctx context.Context) error {
@@ -32,7 +48,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	defer releaseLock(lock)
 
-	log.Println("starting daemon")
+	slog.Info("starting daemon")
 
 	client, db, err := newRiverClient(ctx, d.cfg)
 	if err != nil {
@@ -45,28 +61,37 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.jobsDB.Close()
 		return fmt.Errorf("start river: %w", err)
 	}
-	log.Println("river job queue started")
+	slog.Info("river job queue started")
 
-	waErrCh := runWhatsAppSync(ctx, d.cfg)
-	anErrCh := runAppleNotesSync(ctx, d.cfg)
+	var waErrCh, anErrCh <-chan error
+	if !d.skipWhatsApp {
+		waErrCh = runWhatsAppSync(ctx, d.cfg)
+	}
+	if !d.skipAppleNotes {
+		anErrCh = runAppleNotesSync(ctx, d.cfg)
+	}
 
 	// Block until context is cancelled (signal received).
 	<-ctx.Done()
-	log.Println("shutting down daemon")
+	slog.Info("shutting down daemon")
 
 	// Drain sync errors.
-	if err := <-waErrCh; err != nil {
-		log.Printf("whatsapp error during shutdown: %v", err)
+	if waErrCh != nil {
+		if err := <-waErrCh; err != nil {
+			slog.Error("whatsapp error during shutdown", "error", err)
+		}
 	}
-	if err := <-anErrCh; err != nil {
-		log.Printf("applenotes error during shutdown: %v", err)
+	if anErrCh != nil {
+		if err := <-anErrCh; err != nil {
+			slog.Error("applenotes error during shutdown", "error", err)
+		}
 	}
 
 	if err := d.river.Stop(context.Background()); err != nil {
-		log.Printf("river stop error: %v", err)
+		slog.Error("river stop error", "error", err)
 	}
 	d.jobsDB.Close()
 
-	log.Println("daemon stopped")
+	slog.Info("daemon stopped")
 	return nil
 }

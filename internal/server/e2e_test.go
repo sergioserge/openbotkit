@@ -1,0 +1,80 @@
+package server
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"testing"
+
+	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/internal/servertest"
+	"github.com/priyanshujain/openbotkit/memory"
+	"github.com/priyanshujain/openbotkit/remote"
+	ansrc "github.com/priyanshujain/openbotkit/source/applenotes"
+	"github.com/priyanshujain/openbotkit/store"
+)
+
+func newLocalBackend(t *testing.T) servertest.Backend {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("OBK_CONFIG_DIR", dir)
+
+	cfg := config.Default()
+	cfg.Auth = &config.AuthConfig{Username: "test", Password: "test"}
+
+	for _, src := range []string{"gmail", "whatsapp", "history", "user_memory", "applenotes"} {
+		if err := os.MkdirAll(filepath.Join(dir, src), 0700); err != nil {
+			t.Fatalf("mkdir %s: %v", src, err)
+		}
+	}
+
+	memDB, err := store.Open(store.Config{Driver: "sqlite", DSN: cfg.UserMemoryDataDSN()})
+	if err != nil {
+		t.Fatalf("open memory db: %v", err)
+	}
+	if err := memory.Migrate(memDB); err != nil {
+		t.Fatalf("migrate memory: %v", err)
+	}
+	memDB.Close()
+
+	anDB, err := store.Open(store.Config{Driver: "sqlite", DSN: cfg.AppleNotesDataDSN()})
+	if err != nil {
+		t.Fatalf("open applenotes db: %v", err)
+	}
+	if err := ansrc.Migrate(anDB); err != nil {
+		t.Fatalf("migrate applenotes: %v", err)
+	}
+	anDB.Close()
+
+	s := &Server{cfg: cfg}
+	mux := http.NewServeMux()
+	s.routes(mux)
+	ts := httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+
+	return servertest.Backend{
+		Client:       remote.NewClient(ts.URL, "test", "test"),
+		NoAuthClient: remote.NewClient(ts.URL, "", ""),
+		SeedDB: func(t *testing.T, source, sql string) {
+			t.Helper()
+			dsn, err := cfg.SourceDataDSN(source)
+			if err != nil {
+				t.Fatalf("source DSN: %v", err)
+			}
+			if err := exec.Command("sqlite3", dsn, sql).Run(); err != nil {
+				t.Fatalf("seed %s: %v", source, err)
+			}
+		},
+	}
+}
+
+// TestServer_Local runs the full server test suite against a local httptest server.
+func TestServer_Local(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not in PATH")
+	}
+	b := newLocalBackend(t)
+	servertest.Run(t, b)
+}

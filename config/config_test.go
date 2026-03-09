@@ -112,6 +112,157 @@ func TestRequireSetup_OK(t *testing.T) {
 	}
 }
 
+func TestResolvedMode_DefaultsToLocal(t *testing.T) {
+	cfg := Default()
+	if cfg.ResolvedMode() != ModeLocal {
+		t.Fatalf("expected local, got %q", cfg.ResolvedMode())
+	}
+}
+
+func TestResolvedMode_ExplicitValues(t *testing.T) {
+	tests := []struct {
+		mode Mode
+		want Mode
+	}{
+		{ModeLocal, ModeLocal},
+		{ModeRemote, ModeRemote},
+		{ModeServer, ModeServer},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.mode), func(t *testing.T) {
+			cfg := Default()
+			cfg.Mode = tt.mode
+			if cfg.ResolvedMode() != tt.want {
+				t.Fatalf("expected %q, got %q", tt.want, cfg.ResolvedMode())
+			}
+		})
+	}
+}
+
+func TestIsLocal_IsRemote_IsServer(t *testing.T) {
+	cfg := Default()
+	if !cfg.IsLocal() {
+		t.Fatal("default should be local")
+	}
+	if cfg.IsRemote() {
+		t.Fatal("default should not be remote")
+	}
+	if cfg.IsServer() {
+		t.Fatal("default should not be server")
+	}
+
+	cfg.Mode = ModeRemote
+	if cfg.IsLocal() {
+		t.Fatal("remote should not be local")
+	}
+	if !cfg.IsRemote() {
+		t.Fatal("remote should be remote")
+	}
+
+	cfg.Mode = ModeServer
+	if !cfg.IsServer() {
+		t.Fatal("server should be server")
+	}
+}
+
+func TestSourceDataDSN_ValidSources(t *testing.T) {
+	cfg := Default()
+	sources := []struct {
+		name   string
+		suffix string
+	}{
+		{"gmail", filepath.Join("gmail", "data.db")},
+		{"whatsapp", filepath.Join("whatsapp", "data.db")},
+		{"history", filepath.Join("history", "data.db")},
+		{"user_memory", filepath.Join("user_memory", "data.db")},
+		{"applenotes", filepath.Join("applenotes", "data.db")},
+	}
+	for _, s := range sources {
+		t.Run(s.name, func(t *testing.T) {
+			dsn, err := cfg.SourceDataDSN(s.name)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.HasSuffix(dsn, s.suffix) {
+				t.Fatalf("expected path ending in %s, got %q", s.suffix, dsn)
+			}
+		})
+	}
+}
+
+func TestSourceDataDSN_UnknownSource(t *testing.T) {
+	cfg := Default()
+	_, err := cfg.SourceDataDSN("unknown")
+	if err == nil {
+		t.Fatal("expected error for unknown source")
+	}
+}
+
+func TestConfigRoundTrip_WithModeAndRemote(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	cfg := Default()
+	cfg.Mode = ModeRemote
+	cfg.Remote = &RemoteConfig{
+		Server:   "https://example.com:8443",
+		Username: "testuser",
+		Password: "testpass",
+	}
+	cfg.Auth = &AuthConfig{
+		Username: "admin",
+		Password: "secret",
+	}
+	cfg.Channels = &ChannelsConfig{
+		Telegram: &TelegramConfig{
+			BotToken: "123:abc",
+			OwnerID:  42,
+		},
+	}
+
+	if err := cfg.SaveTo(cfgPath); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	loaded, err := LoadFrom(cfgPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if loaded.Mode != ModeRemote {
+		t.Fatalf("expected remote mode, got %q", loaded.Mode)
+	}
+	if loaded.Remote == nil || loaded.Remote.Server != "https://example.com:8443" {
+		t.Fatal("remote config not preserved")
+	}
+	if loaded.Auth == nil || loaded.Auth.Username != "admin" {
+		t.Fatal("auth config not preserved")
+	}
+	if loaded.Channels == nil || loaded.Channels.Telegram == nil || loaded.Channels.Telegram.OwnerID != 42 {
+		t.Fatal("channels config not preserved")
+	}
+}
+
+func TestBackwardCompat_NoModeField(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := `
+gmail:
+  storage:
+    driver: sqlite
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFrom(cfgPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.IsLocal() {
+		t.Fatalf("old config without mode should default to local, got %q", cfg.ResolvedMode())
+	}
+}
+
 func TestSaveAndLoad(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.yaml")

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"text/tabwriter"
@@ -84,18 +84,18 @@ var fetchCmd = &cobra.Command{
 		for _, id := range msgIDs {
 			email, err := gmailsrc.FetchEmail(srv, account, id, limiter)
 			if err != nil {
-				log.Printf("Error fetching %s: %v", id, err)
+				slog.Error("error fetching email", "id", id, "error", err)
 				continue
 			}
 
 			if dlAttachments {
 				if err := gmailsrc.SaveAttachments(email, attachDir); err != nil {
-					log.Printf("Error saving attachments for %s: %v", id, err)
+					slog.Error("error saving attachments", "id", id, "error", err)
 				}
 			}
 
 			if _, err := gmailsrc.SaveEmail(db, email); err != nil {
-				log.Printf("Error saving %s: %v", id, err)
+				slog.Error("error saving email", "id", id, "error", err)
 			}
 
 			fetched = append(fetched, email)

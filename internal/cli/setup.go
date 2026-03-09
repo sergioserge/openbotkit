@@ -15,6 +15,7 @@ import (
 	"github.com/priyanshujain/openbotkit/internal/skills"
 	"github.com/priyanshujain/openbotkit/internal/tty"
 	"github.com/priyanshujain/openbotkit/oauth/google"
+	"github.com/priyanshujain/openbotkit/remote"
 	ansrc "github.com/priyanshujain/openbotkit/source/applenotes"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
@@ -32,6 +33,26 @@ var setupCmd = &cobra.Command{
 
 		fmt.Print("\n  Welcome to OpenBotKit setup!\n\n")
 
+		var mode string
+		err := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("How will you deploy OpenBotKit?").
+					Options(
+						huh.NewOption("Local (everything runs on this machine)", "local"),
+						huh.NewOption("Remote (server in Docker, this machine as controller)", "remote"),
+					).
+					Value(&mode),
+			),
+		).Run()
+		if err != nil {
+			return err
+		}
+
+		if mode == "remote" {
+			return setupRemote()
+		}
+
 		var sources []string
 		sourceOptions := []huh.Option[string]{
 			huh.NewOption("LLM Models (for obk chat)", "models"),
@@ -48,7 +69,7 @@ var setupCmd = &cobra.Command{
 			sourceOptions = append(sourceOptions, huh.NewOption("Apple Notes", "applenotes"))
 		}
 
-		err := huh.NewForm(
+		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
 					Title("Which sources would you like to set up?").
@@ -141,6 +162,66 @@ var setupCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func setupRemote() error {
+	fmt.Println("\n  -- Remote Deployment Setup --")
+	fmt.Println("  Deploy the server using Docker:")
+	fmt.Println("    docker compose -f infrastructure/docker/docker-compose.yml up -d")
+	fmt.Println()
+
+	var serverURL, username, password string
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Remote server URL").
+				Placeholder("http://your-server:8443").
+				Value(&serverURL),
+			huh.NewInput().
+				Title("Username").
+				Value(&username),
+			huh.NewInput().
+				Title("Password").
+				EchoMode(huh.EchoModePassword).
+				Value(&password),
+		),
+	).Run()
+	if err != nil {
+		return err
+	}
+
+	serverURL = strings.TrimRight(strings.TrimSpace(serverURL), "/")
+	if serverURL == "" {
+		return fmt.Errorf("server URL is required")
+	}
+
+	fmt.Print("  Testing connection... ")
+	client := remote.NewClient(serverURL, username, password)
+	if _, err := client.Health(); err != nil {
+		fmt.Println("failed!")
+		return fmt.Errorf("cannot reach server: %w", err)
+	}
+	fmt.Println("ok!")
+
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	cfg.Mode = config.ModeRemote
+	cfg.Remote = &config.RemoteConfig{
+		Server:   serverURL,
+		Username: username,
+		Password: password,
+	}
+
+	if err := cfg.Save(); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
+	fmt.Println("\n  Remote setup complete!")
+	fmt.Println("  Your CLI commands will now proxy to the remote server.")
+	return nil
 }
 
 func setupGoogle(cfg *config.Config) error {

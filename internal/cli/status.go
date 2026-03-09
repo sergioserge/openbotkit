@@ -26,6 +26,20 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
+		if cfg.IsRemote() {
+			client, err := remoteClient(cfg)
+			if err != nil {
+				return err
+			}
+			health, err := client.Health()
+			if err != nil {
+				return fmt.Errorf("remote server unreachable: %w", err)
+			}
+			fmt.Printf("Remote server: %s\n", cfg.Remote.Server)
+			fmt.Printf("Status: %s\n", health["status"])
+			return nil
+		}
+
 		gp := google.New(google.Config{
 			CredentialsFile: cfg.GoogleCredentialsFile(),
 			TokenDBPath:     cfg.GoogleTokenDBPath(),

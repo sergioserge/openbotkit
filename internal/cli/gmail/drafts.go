@@ -31,6 +31,19 @@ var draftsCreateCmd = &cobra.Command{
 		body, _ := cmd.Flags().GetString("body")
 		account, _ := cmd.Flags().GetString("account")
 
+		if cfg.IsRemote() {
+			client, err := newRemoteClient(cfg)
+			if err != nil {
+				return err
+			}
+			result, err := client.GmailDraft(to, cc, bcc, subject, body, account)
+			if err != nil {
+				return fmt.Errorf("create draft failed: %w", err)
+			}
+			fmt.Printf("Draft created (draft ID: %s, message ID: %s)\n", result.DraftID, result.MessageID)
+			return nil
+		}
+
 		gp := google.New(google.Config{
 			CredentialsFile: cfg.GoogleCredentialsFile(),
 			TokenDBPath:     cfg.GoogleTokenDBPath(),

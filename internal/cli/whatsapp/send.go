@@ -29,6 +29,19 @@ var messagesSendCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
+		if cfg.IsRemote() {
+			client, err := newRemoteClient(cfg)
+			if err != nil {
+				return err
+			}
+			result, err := client.WhatsAppSend(to, text)
+			if err != nil {
+				return fmt.Errorf("send message: %w", err)
+			}
+			fmt.Printf("Message sent: id=%s at %s\n", result.MessageID, result.Timestamp)
+			return nil
+		}
+
 		if err := config.EnsureSourceDir("whatsapp"); err != nil {
 			return fmt.Errorf("create whatsapp dir: %w", err)
 		}
