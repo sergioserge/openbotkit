@@ -139,12 +139,18 @@ func (sm *SessionManager) saveHistory(userMsg, assistantMsg string) {
 		return
 	}
 
-	historysrc.SaveMessage(histDB, convID, "user", userMsg)
-	historysrc.SaveMessage(histDB, convID, "assistant", assistantMsg)
+	if err := historysrc.SaveMessage(histDB, convID, "user", userMsg); err != nil {
+		log.Printf("telegram session: save user message: %v", err)
+	}
+	if err := historysrc.SaveMessage(histDB, convID, "assistant", assistantMsg); err != nil {
+		log.Printf("telegram session: save assistant message: %v", err)
+	}
 }
 
 func generateSessionID() string {
 	var b [16]byte
-	rand.Read(b[:])
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("tg-%d", time.Now().UnixNano())
+	}
 	return fmt.Sprintf("tg-%x", b[:])
 }
