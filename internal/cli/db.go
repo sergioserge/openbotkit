@@ -24,7 +24,7 @@ var dbCmd = &cobra.Command{
 		}
 
 		if cfg.IsRemote() {
-			return fmt.Errorf("remote mode not yet implemented for db command")
+			return dbRemote(cfg, source, query)
 		}
 
 		return dbLocal(cfg, source, query)
@@ -50,6 +50,44 @@ func dbLocal(cfg *config.Config, source, query string) error {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()
+}
+
+func dbRemote(cfg *config.Config, source, query string) error {
+	client, err := remoteClient(cfg)
+	if err != nil {
+		return err
+	}
+
+	resp, err := client.DB(source, query)
+	if err != nil {
+		return err
+	}
+
+	if len(resp.Columns) == 0 {
+		return nil
+	}
+
+	// Print header
+	for i, col := range resp.Columns {
+		if i > 0 {
+			fmt.Print("\t")
+		}
+		fmt.Print(col)
+	}
+	fmt.Println()
+
+	// Print rows
+	for _, row := range resp.Rows {
+		for i, val := range row {
+			if i > 0 {
+				fmt.Print("\t")
+			}
+			fmt.Print(val)
+		}
+		fmt.Println()
+	}
+
+	return nil
 }
 
 func init() {
