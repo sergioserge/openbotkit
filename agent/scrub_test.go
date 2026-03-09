@@ -73,6 +73,16 @@ func TestScrubCredentials(t *testing.T) {
 			input: "authorization=bearer eyJhbGciOiJ",
 			want:  "authorization=bear**** eyJh****",
 		},
+		{
+			name:  "standalone bearer token",
+			input: "Bearer eyJhbGciOiJIUzI1NiJ9",
+			want:  "Bearer eyJh****",
+		},
+		{
+			name:  "short bearer token",
+			input: "Bearer abcd",
+			want:  "Bearer ****",
+		},
 	}
 
 	for _, tt := range tests {
