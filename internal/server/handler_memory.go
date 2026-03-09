@@ -7,6 +7,8 @@ import (
 	"strconv"
 
 	"github.com/priyanshujain/openbotkit/memory"
+	"github.com/priyanshujain/openbotkit/provider"
+	historysrc "github.com/priyanshujain/openbotkit/source/history"
 	"github.com/priyanshujain/openbotkit/store"
 )
 
@@ -138,3 +140,126 @@ func (s *Server) handleMemoryDelete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+type memoryExtractRequest struct {
+	Last int `json:"last"`
+}
+
+type memoryExtractResponse struct {
+	Added   int `json:"added"`
+	Updated int `json:"updated"`
+	Deleted int `json:"deleted"`
+	Skipped int `json:"skipped"`
+}
+
+func (s *Server) handleMemoryExtract(w http.ResponseWriter, r *http.Request) {
+	var req memoryExtractRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Last <= 0 {
+		req.Last = 1
+	}
+
+	histDB, err := store.Open(store.Config{
+		Driver: s.cfg.History.Storage.Driver,
+		DSN:    s.cfg.HistoryDataDSN(),
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("open history db: %v", err))
+		return
+	}
+	defer histDB.Close()
+
+	messages, err := loadRecentMessages(histDB, req.Last)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("load messages: %v", err))
+		return
+	}
+
+	if len(messages) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(memoryExtractResponse{})
+		return
+	}
+
+	memDB, err := s.openMemoryDB()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer memDB.Close()
+
+	llm, err := s.buildLLM()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build LLM: %v", err))
+		return
+	}
+
+	ctx := r.Context()
+	candidates, err := memory.Extract(ctx, llm, messages)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("extract: %v", err))
+		return
+	}
+
+	if len(candidates) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(memoryExtractResponse{})
+		return
+	}
+
+	result, err := memory.Reconcile(ctx, memDB, llm, candidates)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("reconcile: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(memoryExtractResponse{
+		Added:   result.Added,
+		Updated: result.Updated,
+		Deleted: result.Deleted,
+		Skipped: result.Skipped,
+	})
+}
+
+func loadRecentMessages(db *store.DB, lastN int) ([]string, error) {
+	if err := historysrc.Migrate(db); err != nil {
+		return nil, fmt.Errorf("migrate history: %w", err)
+	}
+
+	query := db.Rebind(`
+		SELECT m.content FROM history_messages m
+		JOIN history_conversations c ON c.id = m.conversation_id
+		WHERE m.role = 'user'
+		ORDER BY c.updated_at DESC, m.timestamp DESC
+		LIMIT ?`)
+
+	rows, err := db.Query(query, lastN*50)
+	if err != nil {
+		return nil, fmt.Errorf("query messages: %w", err)
+	}
+	defer rows.Close()
+
+	var messages []string
+	for rows.Next() {
+		var content string
+		if err := rows.Scan(&content); err != nil {
+			return nil, fmt.Errorf("scan message: %w", err)
+		}
+		messages = append(messages, content)
+	}
+	return messages, rows.Err()
+}
+
+func (s *Server) buildLLM() (memory.LLM, error) {
+	registry, err := provider.NewRegistry(s.cfg.Models)
+	if err != nil {
+		return nil, fmt.Errorf("create provider registry: %w", err)
+	}
+	router := provider.NewRouter(registry, s.cfg.Models)
+	return &memory.RouterLLM{Router: router, Tier: provider.TierFast}, nil
+}
+
