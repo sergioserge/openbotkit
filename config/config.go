@@ -13,8 +13,9 @@ type Config struct {
 	Models       *ModelsConfig       `yaml:"models,omitempty"`
 	Gmail        *GmailConfig        `yaml:"gmail,omitempty"`
 	WhatsApp     *WhatsAppConfig     `yaml:"whatsapp,omitempty"`
-	Memory       *MemoryConfig       `yaml:"memory,omitempty"`
+	History      *HistoryConfig       `yaml:"history,omitempty"`
 	AppleNotes   *AppleNotesConfig   `yaml:"applenotes,omitempty"`
+	UserMemory   *UserMemoryConfig    `yaml:"user_memory,omitempty"`
 	Daemon       *DaemonConfig       `yaml:"daemon,omitempty"`
 	Integrations *IntegrationsConfig `yaml:"integrations,omitempty"`
 }
@@ -69,7 +70,11 @@ type GmailConfig struct {
 	Storage             StorageConfig `yaml:"storage,omitempty"`
 }
 
-type MemoryConfig struct {
+type HistoryConfig struct {
+	Storage StorageConfig `yaml:"storage,omitempty"`
+}
+
+type UserMemoryConfig struct {
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
 
@@ -137,7 +142,12 @@ func Default() *Config {
 				Driver: "sqlite",
 			},
 		},
-		Memory: &MemoryConfig{
+		History: &HistoryConfig{
+			Storage: StorageConfig{
+				Driver: "sqlite",
+			},
+		},
+		UserMemory: &UserMemoryConfig{
 			Storage: StorageConfig{
 				Driver: "sqlite",
 			},
@@ -168,11 +178,17 @@ func (c *Config) applyDefaults() {
 	if c.WhatsApp.Storage.Driver == "" {
 		c.WhatsApp.Storage.Driver = "sqlite"
 	}
-	if c.Memory == nil {
-		c.Memory = &MemoryConfig{}
+	if c.History == nil {
+		c.History = &HistoryConfig{}
 	}
-	if c.Memory.Storage.Driver == "" {
-		c.Memory.Storage.Driver = "sqlite"
+	if c.History.Storage.Driver == "" {
+		c.History.Storage.Driver = "sqlite"
+	}
+	if c.UserMemory == nil {
+		c.UserMemory = &UserMemoryConfig{}
+	}
+	if c.UserMemory.Storage.Driver == "" {
+		c.UserMemory.Storage.Driver = "sqlite"
 	}
 	if c.AppleNotes == nil {
 		c.AppleNotes = &AppleNotesConfig{}
@@ -206,11 +222,18 @@ func (c *Config) WhatsAppSessionDBPath() string {
 	return filepath.Join(SourceDir("whatsapp"), "session.db")
 }
 
-func (c *Config) MemoryDataDSN() string {
-	if c.Memory.Storage.DSN != "" {
-		return c.Memory.Storage.DSN
+func (c *Config) HistoryDataDSN() string {
+	if c.History.Storage.DSN != "" {
+		return c.History.Storage.DSN
 	}
-	return filepath.Join(SourceDir("memory"), "data.db")
+	return filepath.Join(SourceDir("history"), "data.db")
+}
+
+func (c *Config) UserMemoryDataDSN() string {
+	if c.UserMemory.Storage.DSN != "" {
+		return c.UserMemory.Storage.DSN
+	}
+	return filepath.Join(SourceDir("user_memory"), "data.db")
 }
 
 func (c *Config) AppleNotesDataDSN() string {

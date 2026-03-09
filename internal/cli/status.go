@@ -11,7 +11,7 @@ import (
 	"github.com/priyanshujain/openbotkit/source"
 	ansrc "github.com/priyanshujain/openbotkit/source/applenotes"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
-	memorysrc "github.com/priyanshujain/openbotkit/source/memory"
+	historysrc "github.com/priyanshujain/openbotkit/source/history"
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
@@ -38,8 +38,8 @@ var statusCmd = &cobra.Command{
 		})
 		source.Register(wa)
 
-		mem := memorysrc.New(memorysrc.Config{})
-		source.Register(mem)
+		hist := historysrc.New(historysrc.Config{})
+		source.Register(hist)
 
 		an := ansrc.New(ansrc.Config{})
 		source.Register(an)
@@ -70,14 +70,14 @@ var statusCmd = &cobra.Command{
 				if db != nil {
 					wasrc.Migrate(db)
 				}
-			case "memory":
-				dsn := cfg.MemoryDataDSN()
+			case "history":
+				dsn := cfg.HistoryDataDSN()
 				db, _ = store.Open(store.Config{
-					Driver: cfg.Memory.Storage.Driver,
+					Driver: cfg.History.Storage.Driver,
 					DSN:    dsn,
 				})
 				if db != nil {
-					memorysrc.Migrate(db)
+					historysrc.Migrate(db)
 				}
 			case "applenotes":
 				dsn := cfg.AppleNotesDataDSN()

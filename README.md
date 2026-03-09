@@ -28,7 +28,7 @@ Think of it like a meal kit instead of a pre-made meal. You get the ingredients 
 
 | Component | What it does |
 |---|---|
-| **Sources** | Connectors for Gmail, WhatsApp, Apple Notes, and conversation memory |
+| **Sources** | Connectors for Gmail, WhatsApp, Apple Notes, and conversation history |
 | **Sync engine** | Background daemon (launchd/systemd) keeps your local data fresh |
 | **CLI** (`obk`) | Search, read, and send across all sources from the terminal |
 | **Assistant scaffolding** | Pre-configured Claude Code setup with skills for natural-language access |
@@ -114,8 +114,10 @@ Config and all synced data live under `~/.obk/` (override with `OBK_CONFIG_DIR`)
 │   └── data.db             # Synced messages
 ├── applenotes/
 │   └── data.db             # Synced notes
-└── memory/
-    └── data.db             # Conversation history
+├── history/
+│   └── data.db             # Conversation history
+└── user_memory/
+    └── data.db             # Personal facts about the user
 ```
 
 ## Prerequisites

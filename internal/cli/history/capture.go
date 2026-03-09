@@ -1,4 +1,4 @@
-package memory
+package history
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/priyanshujain/openbotkit/config"
-	memorysrc "github.com/priyanshujain/openbotkit/source/memory"
+	historysrc "github.com/priyanshujain/openbotkit/source/history"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +16,7 @@ var captureCmd = &cobra.Command{
 	Short: "Capture a conversation from a Claude Code transcript",
 	Long:  "Reads capture input as JSON from stdin. Designed to be called by Claude Code hooks.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var input memorysrc.CaptureInput
+		var input historysrc.CaptureInput
 		if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
 			return fmt.Errorf("decode stdin: %w", err)
 		}
@@ -30,13 +30,13 @@ var captureCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
-		if err := config.EnsureSourceDir("memory"); err != nil {
-			return fmt.Errorf("ensure memory dir: %w", err)
+		if err := config.EnsureSourceDir("history"); err != nil {
+			return fmt.Errorf("ensure history dir: %w", err)
 		}
 
-		dsn := cfg.MemoryDataDSN()
+		dsn := cfg.HistoryDataDSN()
 		db, err := store.Open(store.Config{
-			Driver: cfg.Memory.Storage.Driver,
+			Driver: cfg.History.Storage.Driver,
 			DSN:    dsn,
 		})
 		if err != nil {
@@ -44,7 +44,7 @@ var captureCmd = &cobra.Command{
 		}
 		defer db.Close()
 
-		if err := memorysrc.Capture(db, input); err != nil {
+		if err := historysrc.Capture(db, input); err != nil {
 			return fmt.Errorf("capture: %w", err)
 		}
 
