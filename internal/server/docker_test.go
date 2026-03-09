@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,6 +31,14 @@ func TestServer_Docker(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
+	// The server requires a config with models configured.
+	configYAML := `models:
+  default: gemini/gemini-2.5-flash
+  providers:
+    gemini:
+      provider: gemini
+`
+
 	req := testcontainers.ContainerRequest{
 		FromDockerfile: testcontainers.FromDockerfile{
 			Context:    "../../",
@@ -41,6 +50,13 @@ func TestServer_Docker(t *testing.T) {
 			"OBK_AUTH_USERNAME": "testuser",
 			"OBK_AUTH_PASSWORD": "testpass",
 			"GEMINI_API_KEY":    geminiKey,
+		},
+		Files: []testcontainers.ContainerFile{
+			{
+				Reader:            strings.NewReader(configYAML),
+				ContainerFilePath: "/data/config.yaml",
+				FileMode:          0644,
+			},
 		},
 		Cmd: []string{"server", "--addr", ":8443"},
 		WaitingFor: wait.ForHTTP("/api/health").
@@ -71,8 +87,6 @@ func TestServer_Docker(t *testing.T) {
 	b := servertest.Backend{
 		Client:       remote.NewClient(baseURL, "testuser", "testpass"),
 		NoAuthClient: remote.NewClient(baseURL, "", ""),
-		// No SeedDB — can't exec sqlite3 inside the container directly.
-		// DB proxy tests use API-seeded data (applenotes push).
 	}
 	servertest.Run(t, b)
 }
