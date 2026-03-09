@@ -22,6 +22,27 @@ var listCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
+		if cfg.IsRemote() {
+			client, err := newRemoteClient(cfg)
+			if err != nil {
+				return err
+			}
+			items, err := client.MemoryList(listCategory)
+			if err != nil {
+				return fmt.Errorf("list: %w", err)
+			}
+			if len(items) == 0 {
+				fmt.Println("No memories stored.")
+				return nil
+			}
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "ID\tCATEGORY\tCONTENT\tSOURCE")
+			for _, m := range items {
+				fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", m.ID, m.Category, m.Content, m.Source)
+			}
+			return w.Flush()
+		}
+
 		if err := config.EnsureSourceDir("user_memory"); err != nil {
 			return fmt.Errorf("ensure user_memory dir: %w", err)
 		}

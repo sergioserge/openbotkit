@@ -26,6 +26,19 @@ var addCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
+		if cfg.IsRemote() {
+			client, err := newRemoteClient(cfg)
+			if err != nil {
+				return err
+			}
+			id, err := client.MemoryAdd(content, addCategory, addSource)
+			if err != nil {
+				return fmt.Errorf("add: %w", err)
+			}
+			fmt.Printf("Added memory #%d\n", id)
+			return nil
+		}
+
 		if err := config.EnsureSourceDir("user_memory"); err != nil {
 			return fmt.Errorf("ensure user_memory dir: %w", err)
 		}
