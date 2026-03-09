@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -25,6 +26,10 @@ import (
 type Server struct {
 	cfg  *config.Config
 	addr string
+	ctx  context.Context
+
+	waMu   sync.Mutex
+	waAuth *whatsAppAuth
 }
 
 func New(cfg *config.Config, addr string) *Server {
@@ -32,6 +37,8 @@ func New(cfg *config.Config, addr string) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	s.ctx = ctx
+
 	mux := http.NewServeMux()
 	s.routes(mux)
 
