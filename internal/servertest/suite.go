@@ -26,6 +26,8 @@ func Run(t *testing.T, b Backend) {
 	t.Run("applenotes_push_and_query", func(t *testing.T) { testAppleNotes(t, b) })
 	t.Run("db_reject_non_select", func(t *testing.T) { testDBRejectNonSelect(t, b) })
 	t.Run("db_reject_unknown_source", func(t *testing.T) { testDBRejectUnknownSource(t, b) })
+	t.Run("gmail_send_validation", func(t *testing.T) { testGmailSendValidation(t, b) })
+	t.Run("whatsapp_send_validation", func(t *testing.T) { testWhatsAppSendValidation(t, b) })
 	if b.SeedDB != nil {
 		t.Run("db_seeded_queries", func(t *testing.T) { testDBSeededQueries(t, b) })
 	}
@@ -179,6 +181,44 @@ func testDBRejectUnknownSource(t *testing.T, b Backend) {
 	_, err := b.Client.DB("nonexistent", "SELECT 1")
 	if err == nil {
 		t.Fatal("expected error for unknown source")
+	}
+}
+
+func testGmailSendValidation(t *testing.T, b Backend) {
+	// Empty recipients should fail
+	_, err := b.Client.GmailSend(nil, nil, nil, "test", "body", "")
+	if err == nil {
+		t.Fatal("expected error for empty recipients")
+	}
+
+	// No auth should fail
+	if b.NoAuthClient != nil {
+		_, err = b.NoAuthClient.GmailSend([]string{"a@b.com"}, nil, nil, "test", "body", "")
+		if err == nil {
+			t.Fatal("expected auth error for gmail send")
+		}
+	}
+}
+
+func testWhatsAppSendValidation(t *testing.T, b Backend) {
+	// Empty to should fail
+	_, err := b.Client.WhatsAppSend("", "hello")
+	if err == nil {
+		t.Fatal("expected error for empty to")
+	}
+
+	// Empty text should fail
+	_, err = b.Client.WhatsAppSend("123@s.whatsapp.net", "")
+	if err == nil {
+		t.Fatal("expected error for empty text")
+	}
+
+	// No auth should fail
+	if b.NoAuthClient != nil {
+		_, err = b.NoAuthClient.WhatsAppSend("123@s.whatsapp.net", "hello")
+		if err == nil {
+			t.Fatal("expected auth error for whatsapp send")
+		}
 	}
 }
 
