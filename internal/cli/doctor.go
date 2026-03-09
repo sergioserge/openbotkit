@@ -22,12 +22,16 @@ var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Check the health of your obk installation",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, cfgErr := config.Load()
+
 		var results []checkResult
-		results = append(results, checkConfig()...)
-		results = append(results, checkAPIKeys()...)
-		results = append(results, checkGoogleOAuth()...)
-		results = append(results, checkWhatsAppSession()...)
-		results = append(results, checkDatabases()...)
+		results = append(results, checkConfig(cfg, cfgErr)...)
+		if cfgErr == nil {
+			results = append(results, checkAPIKeys(cfg)...)
+			results = append(results, checkGoogleOAuth(cfg)...)
+			results = append(results, checkWhatsAppSession(cfg)...)
+			results = append(results, checkDatabases(cfg)...)
+		}
 		results = append(results, checkService())
 		results = append(results, checkSkills())
 
@@ -38,7 +42,7 @@ var doctorCmd = &cobra.Command{
 	},
 }
 
-func checkConfig() []checkResult {
+func checkConfig(cfg *config.Config, cfgErr error) []checkResult {
 	var results []checkResult
 
 	_, err := os.Stat(config.FilePath())
@@ -48,9 +52,8 @@ func checkConfig() []checkResult {
 	}
 	results = append(results, checkResult{"Config file", "OK", config.FilePath()})
 
-	cfg, err := config.Load()
-	if err != nil {
-		results = append(results, checkResult{"Config parse", "FAIL", err.Error()})
+	if cfgErr != nil {
+		results = append(results, checkResult{"Config parse", "FAIL", cfgErr.Error()})
 		return results
 	}
 
@@ -63,11 +66,7 @@ func checkConfig() []checkResult {
 	return results
 }
 
-func checkAPIKeys() []checkResult {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil
-	}
+func checkAPIKeys(cfg *config.Config) []checkResult {
 	if cfg.Models == nil {
 		return nil
 	}
@@ -90,11 +89,7 @@ func checkAPIKeys() []checkResult {
 	return results
 }
 
-func checkGoogleOAuth() []checkResult {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil
-	}
+func checkGoogleOAuth(cfg *config.Config) []checkResult {
 	path := cfg.GoogleTokenDBPath()
 	if _, err := os.Stat(path); err != nil {
 		return []checkResult{{"Google OAuth", "WARN", "no token DB"}}
@@ -102,11 +97,7 @@ func checkGoogleOAuth() []checkResult {
 	return []checkResult{{"Google OAuth", "OK", path}}
 }
 
-func checkWhatsAppSession() []checkResult {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil
-	}
+func checkWhatsAppSession(cfg *config.Config) []checkResult {
 	path := cfg.WhatsAppSessionDBPath()
 	if _, err := os.Stat(path); err != nil {
 		return []checkResult{{"WhatsApp session", "WARN", "no session DB"}}
@@ -114,25 +105,26 @@ func checkWhatsAppSession() []checkResult {
 	return []checkResult{{"WhatsApp session", "OK", path}}
 }
 
-func checkDatabases() []checkResult {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil
+type dbCheck struct {
+	name string
+	path string
+}
+
+func checkDatabases(cfg *config.Config) []checkResult {
+	dbs := []dbCheck{
+		{"Gmail DB", cfg.GmailDataDSN()},
+		{"WhatsApp DB", cfg.WhatsAppDataDSN()},
+		{"Memory DB", cfg.MemoryDataDSN()},
+		{"AppleNotes DB", cfg.AppleNotesDataDSN()},
+		{"Jobs DB", cfg.JobsDBDSN()},
 	}
 
 	var results []checkResult
-	dbs := map[string]string{
-		"Gmail DB":      cfg.GmailDataDSN(),
-		"WhatsApp DB":   cfg.WhatsAppDataDSN(),
-		"Memory DB":     cfg.MemoryDataDSN(),
-		"AppleNotes DB": cfg.AppleNotesDataDSN(),
-		"Jobs DB":       cfg.JobsDBDSN(),
-	}
-	for name, path := range dbs {
-		if _, err := os.Stat(path); err != nil {
-			results = append(results, checkResult{name, "WARN", "not found"})
+	for _, db := range dbs {
+		if _, err := os.Stat(db.path); err != nil {
+			results = append(results, checkResult{db.name, "WARN", "not found"})
 		} else {
-			results = append(results, checkResult{name, "OK", path})
+			results = append(results, checkResult{db.name, "OK", db.path})
 		}
 	}
 	return results
