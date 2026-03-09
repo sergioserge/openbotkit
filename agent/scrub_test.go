@@ -63,6 +63,16 @@ func TestScrubCredentials(t *testing.T) {
 			input: "Api_Key = test1234",
 			want:  "Api_Key = test****",
 		},
+		{
+			name:  "bearer token",
+			input: "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9",
+			want:  "Authorization: Bear**** eyJh****",
+		},
+		{
+			name:  "bearer lowercase",
+			input: "authorization=bearer eyJhbGciOiJ",
+			want:  "authorization=bear**** eyJh****",
+		},
 	}
 
 	for _, tt := range tests {
