@@ -2,7 +2,7 @@ package daemon
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"runtime"
 	"time"
 
@@ -22,17 +22,17 @@ func runAppleNotesSync(ctx context.Context, cfg *config.Config) <-chan error {
 		defer close(errCh)
 
 		if !config.IsSourceLinked("applenotes") {
-			log.Println("applenotes: not linked, skipping sync")
+			slog.Info("applenotes: not linked, skipping sync")
 			return
 		}
 
 		if runtime.GOOS != "darwin" {
-			log.Println("applenotes: skipping sync (not macOS)")
+			slog.Info("applenotes: skipping sync (not macOS)")
 			return
 		}
 
 		if err := config.EnsureSourceDir("applenotes"); err != nil {
-			log.Printf("applenotes: failed to create dir: %v", err)
+			slog.Error("applenotes: failed to create dir", "error", err)
 			errCh <- err
 			return
 		}
@@ -42,7 +42,7 @@ func runAppleNotesSync(ctx context.Context, cfg *config.Config) <-chan error {
 			DSN:    cfg.AppleNotesDataDSN(),
 		})
 		if err != nil {
-			log.Printf("applenotes: failed to open db: %v", err)
+			slog.Error("applenotes: failed to open db", "error", err)
 			errCh <- err
 			return
 		}
@@ -57,7 +57,7 @@ func runAppleNotesSync(ctx context.Context, cfg *config.Config) <-chan error {
 		for {
 			select {
 			case <-ctx.Done():
-				log.Println("applenotes: stopping sync")
+				slog.Info("applenotes: stopping sync")
 				return
 			case <-ticker.C:
 				syncAppleNotes(db)
@@ -71,9 +71,8 @@ func runAppleNotesSync(ctx context.Context, cfg *config.Config) <-chan error {
 func syncAppleNotes(db *store.DB) {
 	result, err := ansrc.Sync(db, ansrc.SyncOptions{})
 	if err != nil {
-		log.Printf("applenotes: sync error: %v", err)
+		slog.Error("applenotes: sync error", "error", err)
 		return
 	}
-	log.Printf("applenotes: synced=%d skipped=%d errors=%d",
-		result.Synced, result.Skipped, result.Errors)
+	slog.Info("applenotes: sync complete", "synced", result.Synced, "skipped", result.Skipped, "errors", result.Errors)
 }

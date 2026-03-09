@@ -2,7 +2,7 @@ package daemon
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/priyanshujain/openbotkit/config"
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
@@ -18,19 +18,19 @@ func runWhatsAppSync(ctx context.Context, cfg *config.Config) <-chan error {
 		defer close(errCh)
 
 		if !config.IsSourceLinked("whatsapp") {
-			log.Println("whatsapp: not linked, skipping sync")
+			slog.Info("whatsapp: not linked, skipping sync")
 			return
 		}
 
 		client, err := wasrc.NewClient(ctx, cfg.WhatsAppSessionDBPath())
 		if err != nil {
-			log.Printf("whatsapp: failed to create client: %v", err)
+			slog.Error("whatsapp: failed to create client", "error", err)
 			errCh <- err
 			return
 		}
 
 		if !client.IsAuthenticated() {
-			log.Println("whatsapp: not authenticated, skipping sync (run 'obk whatsapp auth' first)")
+			slog.Warn("whatsapp: not authenticated, skipping sync (run 'obk whatsapp auth' first)")
 			return
 		}
 
@@ -39,24 +39,23 @@ func runWhatsAppSync(ctx context.Context, cfg *config.Config) <-chan error {
 			DSN:    cfg.WhatsAppDataDSN(),
 		})
 		if err != nil {
-			log.Printf("whatsapp: failed to open db: %v", err)
+			slog.Error("whatsapp: failed to open db", "error", err)
 			errCh <- err
 			return
 		}
 		defer db.Close()
 
-		log.Println("whatsapp: starting sync")
+		slog.Info("whatsapp: starting sync")
 		result, err := wasrc.Sync(ctx, client, db, wasrc.SyncOptions{
 			Follow: true,
 		})
 		if err != nil {
-			log.Printf("whatsapp: sync error: %v", err)
+			slog.Error("whatsapp: sync error", "error", err)
 			errCh <- err
 			return
 		}
 
-		log.Printf("whatsapp: sync stopped: received=%d history=%d errors=%d",
-			result.Received, result.HistoryMessages, result.Errors)
+		slog.Info("whatsapp: sync stopped", "received", result.Received, "history", result.HistoryMessages, "errors", result.Errors)
 	}()
 
 	return errCh

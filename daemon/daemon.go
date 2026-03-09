@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/riverqueue/river"
 
@@ -48,7 +48,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	defer releaseLock(lock)
 
-	log.Println("starting daemon")
+	slog.Info("starting daemon")
 
 	client, db, err := newRiverClient(ctx, d.cfg)
 	if err != nil {
@@ -61,7 +61,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.jobsDB.Close()
 		return fmt.Errorf("start river: %w", err)
 	}
-	log.Println("river job queue started")
+	slog.Info("river job queue started")
 
 	var waErrCh, anErrCh <-chan error
 	if !d.skipWhatsApp {
@@ -73,25 +73,25 @@ func (d *Daemon) Run(ctx context.Context) error {
 
 	// Block until context is cancelled (signal received).
 	<-ctx.Done()
-	log.Println("shutting down daemon")
+	slog.Info("shutting down daemon")
 
 	// Drain sync errors.
 	if waErrCh != nil {
 		if err := <-waErrCh; err != nil {
-			log.Printf("whatsapp error during shutdown: %v", err)
+			slog.Error("whatsapp error during shutdown", "error", err)
 		}
 	}
 	if anErrCh != nil {
 		if err := <-anErrCh; err != nil {
-			log.Printf("applenotes error during shutdown: %v", err)
+			slog.Error("applenotes error during shutdown", "error", err)
 		}
 	}
 
 	if err := d.river.Stop(context.Background()); err != nil {
-		log.Printf("river stop error: %v", err)
+		slog.Error("river stop error", "error", err)
 	}
 	d.jobsDB.Close()
 
-	log.Println("daemon stopped")
+	slog.Info("daemon stopped")
 	return nil
 }

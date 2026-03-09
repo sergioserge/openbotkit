@@ -2,7 +2,7 @@ package jobs
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/riverqueue/river"
 )
@@ -18,6 +18,6 @@ type ReminderWorker struct {
 }
 
 func (w *ReminderWorker) Work(ctx context.Context, job *river.Job[ReminderArgs]) error {
-	log.Printf("reminder: %s", job.Args.Message)
+	slog.Info("reminder", "message", job.Args.Message)
 	return nil
 }

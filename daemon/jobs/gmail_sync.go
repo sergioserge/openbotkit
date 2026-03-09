@@ -3,7 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/riverqueue/river"
 
@@ -25,11 +25,11 @@ type GmailSyncWorker struct {
 
 func (w *GmailSyncWorker) Work(ctx context.Context, job *river.Job[GmailSyncArgs]) error {
 	if !config.IsSourceLinked("gmail") {
-		log.Println("gmail: not linked, skipping sync")
+		slog.Info("gmail: not linked, skipping sync")
 		return nil
 	}
 
-	log.Println("starting gmail sync job")
+	slog.Info("starting gmail sync job")
 
 	db, err := store.Open(store.Config{
 		Driver: w.Cfg.Gmail.Storage.Driver,
@@ -54,8 +54,7 @@ func (w *GmailSyncWorker) Work(ctx context.Context, job *river.Job[GmailSyncArgs
 		return fmt.Errorf("gmail sync: %w", err)
 	}
 
-	log.Printf("gmail sync complete: fetched=%d skipped=%d errors=%d",
-		result.Fetched, result.Skipped, result.Errors)
+	slog.Info("gmail sync complete", "fetched", result.Fetched, "skipped", result.Skipped, "errors", result.Errors)
 	return nil
 }
 

@@ -3,7 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"runtime"
 	"time"
 
@@ -33,7 +33,7 @@ func RunBridge(ctx context.Context, cfg *config.Config, client *remote.Client) e
 	}
 	defer db.Close()
 
-	log.Println("bridge: starting Apple Notes sync")
+	slog.Info("bridge: starting apple notes sync")
 
 	// Initial sync + push
 	bridgeSyncAndPush(db, client)
@@ -44,7 +44,7 @@ func RunBridge(ctx context.Context, cfg *config.Config, client *remote.Client) e
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("bridge: stopping")
+			slog.Info("bridge: stopping")
 			return nil
 		case <-ticker.C:
 			bridgeSyncAndPush(db, client)
@@ -55,11 +55,10 @@ func RunBridge(ctx context.Context, cfg *config.Config, client *remote.Client) e
 func bridgeSyncAndPush(db *store.DB, client *remote.Client) {
 	result, err := ansrc.Sync(db, ansrc.SyncOptions{})
 	if err != nil {
-		log.Printf("bridge: sync error: %v", err)
+		slog.Error("bridge: sync error", "error", err)
 		return
 	}
-	log.Printf("bridge: synced=%d skipped=%d errors=%d",
-		result.Synced, result.Skipped, result.Errors)
+	slog.Info("bridge: sync complete", "synced", result.Synced, "skipped", result.Skipped, "errors", result.Errors)
 
 	if result.Synced == 0 {
 		return
@@ -67,13 +66,13 @@ func bridgeSyncAndPush(db *store.DB, client *remote.Client) {
 
 	notes, err := ansrc.ListNotes(db, ansrc.ListOptions{Limit: result.Synced})
 	if err != nil {
-		log.Printf("bridge: list notes error: %v", err)
+		slog.Error("bridge: list notes error", "error", err)
 		return
 	}
 
 	if err := client.AppleNotesPush(notes); err != nil {
-		log.Printf("bridge: push error: %v", err)
+		slog.Error("bridge: push error", "error", err)
 	} else {
-		log.Printf("bridge: pushed %d notes to remote", len(notes))
+		slog.Info("bridge: pushed notes to remote", "count", len(notes))
 	}
 }
