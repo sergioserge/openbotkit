@@ -26,6 +26,7 @@ var builtinSkills = map[string]SkillMeta{
 	"whatsapp-read":   {RequiresAuth: "whatsapp"},
 	"whatsapp-send":   {RequiresAuth: "whatsapp", Write: true},
 	"history-read":    {},
+	"memory-save":     {},
 	"applenotes-read": {RequiresAuth: "applenotes"},
 }
 

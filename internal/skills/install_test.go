@@ -191,9 +191,12 @@ func TestInstallBuiltinSkillsNoAuth(t *testing.T) {
 		t.Fatalf("Install: %v", err)
 	}
 
-	// With no auth, only memory-read should be installed.
+	// With no auth, only history-read and memory-save should be installed.
 	if !slices.Contains(result.Installed, "history-read") {
-		t.Error("memory-read should be installed (no auth required)")
+		t.Error("history-read should be installed (no auth required)")
+	}
+	if !slices.Contains(result.Installed, "memory-save") {
+		t.Error("memory-save should be installed (no auth required)")
 	}
 	if slices.Contains(result.Installed, "email-read") {
 		t.Error("email-read should NOT be installed (no gmail auth)")
@@ -205,23 +208,32 @@ func TestInstallBuiltinSkillsNoAuth(t *testing.T) {
 		t.Error("applenotes-read should NOT be installed (not linked)")
 	}
 
-	// Verify SKILL.md was written.
+	// Verify SKILL.md was written for history-read.
 	tmp := config.Dir()
 	content, err := os.ReadFile(filepath.Join(tmp, "skills", "history-read", "SKILL.md"))
 	if err != nil {
-		t.Fatalf("read memory-read SKILL.md: %v", err)
+		t.Fatalf("read history-read SKILL.md: %v", err)
 	}
 	if len(content) == 0 {
-		t.Error("memory-read SKILL.md is empty")
+		t.Error("history-read SKILL.md is empty")
 	}
 
 	// Verify schema.sql was written alongside SKILL.md.
 	schemaContent, err := os.ReadFile(filepath.Join(tmp, "skills", "history-read", "schema.sql"))
 	if err != nil {
-		t.Fatalf("read memory-read schema.sql: %v", err)
+		t.Fatalf("read history-read schema.sql: %v", err)
 	}
 	if len(schemaContent) == 0 {
-		t.Error("memory-read schema.sql is empty")
+		t.Error("history-read schema.sql is empty")
+	}
+
+	// Verify memory-save SKILL.md was written.
+	memorySaveContent, err := os.ReadFile(filepath.Join(tmp, "skills", "memory-save", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read memory-save SKILL.md: %v", err)
+	}
+	if len(memorySaveContent) == 0 {
+		t.Error("memory-save SKILL.md is empty")
 	}
 
 	// Verify manifest was written.
@@ -230,7 +242,10 @@ func TestInstallBuiltinSkillsNoAuth(t *testing.T) {
 		t.Fatalf("load manifest: %v", err)
 	}
 	if _, ok := m.Skills["history-read"]; !ok {
-		t.Error("memory-read not in manifest")
+		t.Error("history-read not in manifest")
+	}
+	if _, ok := m.Skills["memory-save"]; !ok {
+		t.Error("memory-save not in manifest")
 	}
 }
 
