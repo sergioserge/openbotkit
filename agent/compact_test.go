@@ -74,6 +74,26 @@ func TestCompactHistory_EmptyHistory(t *testing.T) {
 	}
 }
 
+func TestCompactHistory_MaxHistoryOne(t *testing.T) {
+	// maxHistory=1, keep=1/2=0, guard sets keep=1.
+	// 5 messages → summary + 1 kept = 2.
+	a := &Agent{maxHistory: 1}
+	for i := range 5 {
+		a.history = append(a.history, provider.NewTextMessage(
+			provider.RoleUser, fmt.Sprintf("msg %d", i)))
+	}
+	a.compactHistory()
+
+	if len(a.history) != 2 {
+		t.Fatalf("history len = %d, want 2 (summary + 1 kept)", len(a.history))
+	}
+
+	last := a.history[1].Content[0].Text
+	if last != "msg 4" {
+		t.Errorf("last message = %q, want 'msg 4'", last)
+	}
+}
+
 func TestCompactHistory_ExactThreshold(t *testing.T) {
 	a := &Agent{maxHistory: 40}
 	for i := range 40 {
