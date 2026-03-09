@@ -29,7 +29,7 @@ func TestChat_TextResponse(t *testing.T) {
 
 	p := New("test-key", WithBaseURL(server.URL))
 	resp, err := p.Chat(context.Background(), provider.ChatRequest{
-		Model:    "gemini-2.0-flash",
+		Model:    "gemini-2.5-flash",
 		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hello")},
 	})
 	if err != nil {
@@ -67,7 +67,7 @@ func TestChat_ToolUse(t *testing.T) {
 
 	p := New("test-key", WithBaseURL(server.URL))
 	resp, err := p.Chat(context.Background(), provider.ChatRequest{
-		Model:    "gemini-2.0-flash",
+		Model:    "gemini-2.5-flash",
 		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "run echo hi")},
 	})
 	if err != nil {
@@ -96,7 +96,7 @@ func TestChat_ErrorResponse(t *testing.T) {
 
 	p := New("bad-key", WithBaseURL(server.URL))
 	_, err := p.Chat(context.Background(), provider.ChatRequest{
-		Model:    "gemini-2.0-flash",
+		Model:    "gemini-2.5-flash",
 		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
 	})
 	if err == nil {
@@ -124,7 +124,7 @@ func TestStreamChat_TextDelta(t *testing.T) {
 
 	p := New("test-key", WithBaseURL(server.URL))
 	ch, err := p.StreamChat(context.Background(), provider.ChatRequest{
-		Model:    "gemini-2.0-flash",
+		Model:    "gemini-2.5-flash",
 		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
 	})
 	if err != nil {
@@ -150,9 +150,9 @@ func TestGeminiIntegration(t *testing.T) {
 
 	p := New(apiKey)
 	resp, err := p.Chat(context.Background(), provider.ChatRequest{
-		Model:     "gemini-2.0-flash",
+		Model:     "gemini-2.5-flash",
 		Messages:  []provider.Message{provider.NewTextMessage(provider.RoleUser, "Say 'hello' and nothing else.")},
-		MaxTokens: 32,
+		MaxTokens: 256,
 	})
 	if err != nil {
 		t.Fatalf("Chat: %v", err)
@@ -178,9 +178,9 @@ func TestGeminiVertexAIIntegration(t *testing.T) {
 
 	p := New("", WithVertexAI(project, region), WithTokenSource(provider.GcloudTokenSource(account)))
 	resp, err := p.Chat(context.Background(), provider.ChatRequest{
-		Model:     "gemini-2.0-flash",
+		Model:     "gemini-2.5-flash",
 		Messages:  []provider.Message{provider.NewTextMessage(provider.RoleUser, "Say 'hello' and nothing else.")},
-		MaxTokens: 32,
+		MaxTokens: 256,
 	})
 	if err != nil {
 		t.Fatalf("Chat: %v", err)

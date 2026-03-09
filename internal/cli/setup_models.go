@@ -49,7 +49,7 @@ var llmProviders = []providerInfo{
 		models: []huh.Option[string]{
 			huh.NewOption("gemini-2.5-pro (most capable)", "gemini-2.5-pro"),
 			huh.NewOption("gemini-2.5-flash (fast, good balance)", "gemini-2.5-flash"),
-			huh.NewOption("gemini-2.0-flash (fastest, cheapest)", "gemini-2.0-flash"),
+			huh.NewOption("gemini-2.0-flash-lite (fastest, cheapest)", "gemini-2.0-flash-lite"),
 		},
 	},
 }

@@ -62,7 +62,7 @@ func availableProviders(t *testing.T) []providerTestCase {
 		providers = append(providers, providerTestCase{
 			name:     "gemini",
 			provider: gemini.New(key),
-			model:    "gemini-2.0-flash",
+			model:    "gemini-2.5-flash",
 		})
 	}
 	if project := os.Getenv("GOOGLE_CLOUD_PROJECT"); project != "" {
@@ -74,7 +74,7 @@ func availableProviders(t *testing.T) []providerTestCase {
 		providers = append(providers, providerTestCase{
 			name:     "gemini-vertex",
 			provider: gemini.New("", gemini.WithVertexAI(project, region), gemini.WithTokenSource(provider.GcloudTokenSource(account))),
-			model:    "gemini-2.0-flash",
+			model:    "gemini-2.5-flash",
 		})
 	}
 
@@ -213,7 +213,7 @@ func TestIntegration_Streaming(t *testing.T) {
 			ch, err := tc.provider.StreamChat(ctx, provider.ChatRequest{
 				Model:     tc.model,
 				Messages:  []provider.Message{provider.NewTextMessage(provider.RoleUser, "Say 'test-stream-ok' and nothing else.")},
-				MaxTokens: 32,
+				MaxTokens: 256,
 			})
 			if err != nil {
 				t.Fatalf("StreamChat: %v", err)
