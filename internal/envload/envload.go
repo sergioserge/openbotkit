@@ -10,6 +10,7 @@ import (
 
 // Load reads a .env file and sets environment variables for the test.
 // It walks up from the working directory looking for .env.
+// Values from .env always override existing env vars (scoped to the test).
 // In CI where no .env exists, this is a no-op.
 func Load(t *testing.T) {
 	t.Helper()
@@ -27,9 +28,7 @@ func Load(t *testing.T) {
 				if len(parts) == 2 {
 					key := strings.TrimSpace(parts[0])
 					val := strings.TrimSpace(parts[1])
-					if os.Getenv(key) == "" {
-						t.Setenv(key, val)
-					}
+					t.Setenv(key, val)
 				}
 			}
 			f.Close()
