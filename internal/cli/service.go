@@ -13,6 +13,8 @@ import (
 	"github.com/priyanshujain/openbotkit/internal/platform"
 )
 
+var bridgeMode bool
+
 var serviceCmd = &cobra.Command{
 	Use:   "service",
 	Short: "Manage the obk background service",
@@ -35,6 +37,17 @@ var serviceRunCmd = &cobra.Command{
 
 		ctx, stop := signal.NotifyContext(cmd.Context(), platform.ShutdownSignals...)
 		defer stop()
+
+		if bridgeMode {
+			if !cfg.IsRemote() {
+				return fmt.Errorf("bridge mode requires remote mode — set 'mode: remote' in config")
+			}
+			client, err := remoteClient(cfg)
+			if err != nil {
+				return err
+			}
+			return daemon.RunBridge(ctx, cfg, client)
+		}
 
 		d := daemon.New(cfg)
 		return d.Run(ctx)
@@ -160,6 +173,7 @@ var serviceRestartCmd = &cobra.Command{
 }
 
 func init() {
+	serviceRunCmd.Flags().BoolVar(&bridgeMode, "bridge", false, "run in bridge mode (sync Apple Notes to remote)")
 	serviceCmd.AddCommand(serviceRunCmd)
 	serviceCmd.AddCommand(serviceInstallCmd)
 	serviceCmd.AddCommand(serviceUninstallCmd)
