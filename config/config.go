@@ -15,6 +15,7 @@ type Config struct {
 	WhatsApp     *WhatsAppConfig     `yaml:"whatsapp,omitempty"`
 	History      *HistoryConfig       `yaml:"history,omitempty"`
 	AppleNotes   *AppleNotesConfig   `yaml:"applenotes,omitempty"`
+	UserMemory   *UserMemoryConfig    `yaml:"user_memory,omitempty"`
 	Daemon       *DaemonConfig       `yaml:"daemon,omitempty"`
 	Integrations *IntegrationsConfig `yaml:"integrations,omitempty"`
 }
@@ -70,6 +71,10 @@ type GmailConfig struct {
 }
 
 type HistoryConfig struct {
+	Storage StorageConfig `yaml:"storage,omitempty"`
+}
+
+type UserMemoryConfig struct {
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
 
@@ -142,6 +147,11 @@ func Default() *Config {
 				Driver: "sqlite",
 			},
 		},
+		UserMemory: &UserMemoryConfig{
+			Storage: StorageConfig{
+				Driver: "sqlite",
+			},
+		},
 		AppleNotes: &AppleNotesConfig{
 			Storage: StorageConfig{
 				Driver: "sqlite",
@@ -173,6 +183,12 @@ func (c *Config) applyDefaults() {
 	}
 	if c.History.Storage.Driver == "" {
 		c.History.Storage.Driver = "sqlite"
+	}
+	if c.UserMemory == nil {
+		c.UserMemory = &UserMemoryConfig{}
+	}
+	if c.UserMemory.Storage.Driver == "" {
+		c.UserMemory.Storage.Driver = "sqlite"
 	}
 	if c.AppleNotes == nil {
 		c.AppleNotes = &AppleNotesConfig{}
@@ -211,6 +227,13 @@ func (c *Config) HistoryDataDSN() string {
 		return c.History.Storage.DSN
 	}
 	return filepath.Join(SourceDir("history"), "data.db")
+}
+
+func (c *Config) UserMemoryDataDSN() string {
+	if c.UserMemory.Storage.DSN != "" {
+		return c.UserMemory.Storage.DSN
+	}
+	return filepath.Join(SourceDir("user_memory"), "data.db")
 }
 
 func (c *Config) AppleNotesDataDSN() string {
