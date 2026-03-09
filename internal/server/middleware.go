@@ -9,10 +9,6 @@ import (
 func (s *Server) basicAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username, password := s.authCredentials()
-		if username == "" && password == "" {
-			next.ServeHTTP(w, r)
-			return
-		}
 
 		u, p, ok := r.BasicAuth()
 		if !ok ||

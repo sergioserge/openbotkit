@@ -67,7 +67,7 @@ func TestBasicAuth_MissingCredentials(t *testing.T) {
 	}
 }
 
-func TestBasicAuth_NoAuthConfigured(t *testing.T) {
+func TestBasicAuth_NoAuthConfigured_RejectsRequests(t *testing.T) {
 	s := &Server{cfg: &config.Config{}}
 
 	handler := s.basicAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +78,8 @@ func TestBasicAuth_NoAuthConfigured(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200 when no auth configured, got %d", rec.Code)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 when no auth configured, got %d", rec.Code)
 	}
 }
 

@@ -39,6 +39,11 @@ func New(cfg *config.Config, addr string) *Server {
 func (s *Server) Run(ctx context.Context) error {
 	s.ctx = ctx
 
+	u, p := s.authCredentials()
+	if u == "" || p == "" {
+		return fmt.Errorf("server requires authentication credentials; set OBK_AUTH_USERNAME and OBK_AUTH_PASSWORD env vars or configure auth in config.yaml")
+	}
+
 	mux := http.NewServeMux()
 	s.routes(mux)
 
