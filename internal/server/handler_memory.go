@@ -44,7 +44,8 @@ func (s *Server) openMemoryDB() (*store.DB, error) {
 func (s *Server) handleMemoryList(w http.ResponseWriter, r *http.Request) {
 	db, err := s.openMemoryDB()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("memory handler: open db", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to open database")
 		return
 	}
 	defer db.Close()
@@ -98,7 +99,8 @@ func (s *Server) handleMemoryAdd(w http.ResponseWriter, r *http.Request) {
 
 	db, err := s.openMemoryDB()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("memory handler: open db", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to open database")
 		return
 	}
 	defer db.Close()
@@ -125,7 +127,8 @@ func (s *Server) handleMemoryDelete(w http.ResponseWriter, r *http.Request) {
 
 	db, err := s.openMemoryDB()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("memory handler: open db", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to open database")
 		return
 	}
 	defer db.Close()
@@ -186,7 +189,8 @@ func (s *Server) handleMemoryExtract(w http.ResponseWriter, r *http.Request) {
 
 	memDB, err := s.openMemoryDB()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("memory extract handler: open memory db", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to open database")
 		return
 	}
 	defer memDB.Close()
