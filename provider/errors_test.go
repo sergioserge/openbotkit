@@ -14,6 +14,18 @@ func TestAPIError_Error(t *testing.T) {
 	}
 }
 
+func TestErrorPermanent_IsZeroValue(t *testing.T) {
+	var k ErrorKind
+	if k != ErrorPermanent {
+		t.Errorf("zero-value ErrorKind = %d, want ErrorPermanent (%d)", k, ErrorPermanent)
+	}
+	// A default-initialized APIError should also be permanent.
+	e := &APIError{}
+	if e.Kind != ErrorPermanent {
+		t.Errorf("default APIError.Kind = %d, want ErrorPermanent (%d)", e.Kind, ErrorPermanent)
+	}
+}
+
 func TestClassifyError(t *testing.T) {
 	tests := []struct {
 		name       string
