@@ -9,9 +9,9 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-// KeychainLoad retrieves an API key from the platform credential store.
+// LoadCredential retrieves an API key from the platform credential store.
 // The ref format is "keychain:<service>/<account>", e.g. "keychain:obk/anthropic".
-func KeychainLoad(ref string) (string, error) {
+func LoadCredential(ref string) (string, error) {
 	service, account, err := parseCredentialRef(ref)
 	if err != nil {
 		return "", err
@@ -19,8 +19,8 @@ func KeychainLoad(ref string) (string, error) {
 	return credentialLoad(service, account)
 }
 
-// KeychainStore saves an API key to the platform credential store.
-func KeychainStore(ref, value string) error {
+// StoreCredential saves an API key to the platform credential store.
+func StoreCredential(ref, value string) error {
 	service, account, err := parseCredentialRef(ref)
 	if err != nil {
 		return err
@@ -32,7 +32,7 @@ func KeychainStore(ref, value string) error {
 // or an environment variable fallback.
 func ResolveAPIKey(ref, envVar string) (string, error) {
 	if ref != "" && strings.HasPrefix(ref, "keychain:") {
-		key, err := KeychainLoad(ref)
+		key, err := LoadCredential(ref)
 		if err == nil && key != "" {
 			return key, nil
 		}
