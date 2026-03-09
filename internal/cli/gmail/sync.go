@@ -7,6 +7,7 @@ import (
 
 	"github.com/priyanshujain/openbotkit/config"
 	"github.com/priyanshujain/openbotkit/oauth/google"
+	"github.com/priyanshujain/openbotkit/remote"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
@@ -19,6 +20,25 @@ var syncCmd = &cobra.Command{
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
+		}
+
+		if cfg.IsRemote() {
+			full, _ := cmd.Flags().GetBool("full")
+			after, _ := cmd.Flags().GetString("after")
+			account, _ := cmd.Flags().GetString("account")
+			days, _ := cmd.Flags().GetInt("days")
+
+			client := remote.NewClient(cfg.Remote.Server, cfg.Remote.Username, cfg.Remote.Password)
+			result, err := client.GmailSync(full, after, account, days)
+			if err != nil {
+				return fmt.Errorf("sync failed: %w", err)
+			}
+			fmt.Printf("\nSync complete: %d fetched, %d skipped", result.Fetched, result.Skipped)
+			if result.Errors > 0 {
+				fmt.Printf(", %d errors", result.Errors)
+			}
+			fmt.Println()
+			return nil
 		}
 
 		dsn := cfg.GmailDataDSN()

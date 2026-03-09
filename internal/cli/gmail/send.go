@@ -6,6 +6,7 @@ import (
 
 	"github.com/priyanshujain/openbotkit/config"
 	"github.com/priyanshujain/openbotkit/oauth/google"
+	"github.com/priyanshujain/openbotkit/remote"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +26,16 @@ var sendCmd = &cobra.Command{
 		subject, _ := cmd.Flags().GetString("subject")
 		body, _ := cmd.Flags().GetString("body")
 		account, _ := cmd.Flags().GetString("account")
+
+		if cfg.IsRemote() {
+			client := remote.NewClient(cfg.Remote.Server, cfg.Remote.Username, cfg.Remote.Password)
+			result, err := client.GmailSend(to, cc, bcc, subject, body, account)
+			if err != nil {
+				return fmt.Errorf("send failed: %w", err)
+			}
+			fmt.Printf("Email sent (message ID: %s, thread ID: %s)\n", result.MessageID, result.ThreadID)
+			return nil
+		}
 
 		gp := google.New(google.Config{
 			CredentialsFile: cfg.GoogleCredentialsFile(),
