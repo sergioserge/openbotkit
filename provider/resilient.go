@@ -6,14 +6,12 @@ import (
 	"time"
 )
 
-// ResilientProvider wraps a Provider with retry logic for transient errors.
 type ResilientProvider struct {
 	inner      Provider
 	maxRetries int
 	baseDelay  time.Duration
 }
 
-// NewResilientProvider wraps p with retry on retryable errors (3 retries, 1s base delay).
 func NewResilientProvider(p Provider) *ResilientProvider {
 	return &ResilientProvider{
 		inner:      p,

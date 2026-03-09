@@ -20,7 +20,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// gwsServices lists the Google Workspace services available via gws.
 var gwsServices = []string{"calendar", "drive", "docs", "sheets", "tasks", "people"}
 
 var setupCmd = &cobra.Command{
@@ -33,7 +32,6 @@ var setupCmd = &cobra.Command{
 
 		fmt.Print("\n  Welcome to OpenBotKit setup!\n\n")
 
-		// Step 1: Source selection.
 		var sources []string
 		sourceOptions := []huh.Option[string]{
 			huh.NewOption("LLM Models (for obk chat)", "models"),
@@ -113,7 +111,6 @@ var setupCmd = &cobra.Command{
 			return fmt.Errorf("save config: %w", err)
 		}
 
-		// Install skills based on current auth state.
 		fmt.Println("\n  -- Installing skills --")
 		result, err := skills.Install(cfg)
 		if err != nil {
@@ -151,7 +148,6 @@ func setupGoogle(cfg *config.Config) error {
 		return fmt.Errorf("create provider dir: %w", err)
 	}
 
-	// Credentials path.
 	defaultCredPath := cfg.GoogleCredentialsFile()
 	var credPath string
 
@@ -177,7 +173,6 @@ func setupGoogle(cfg *config.Config) error {
 		return fmt.Errorf("credentials file not found: %s", credPath)
 	}
 
-	// Save to config.
 	if cfg.Providers == nil {
 		cfg.Providers = &config.ProvidersConfig{}
 	}
@@ -186,7 +181,6 @@ func setupGoogle(cfg *config.Config) error {
 	}
 	cfg.Providers.Google.CredentialsFile = credPath
 
-	// Scope selection.
 	var scopes []string
 	err = huh.NewForm(
 		huh.NewGroup(
@@ -207,7 +201,6 @@ func setupGoogle(cfg *config.Config) error {
 		scopes = []string{"https://www.googleapis.com/auth/gmail.readonly"}
 	}
 
-	// OAuth flow.
 	gp := google.New(google.Config{
 		CredentialsFile: credPath,
 		TokenDBPath:     cfg.GoogleTokenDBPath(),
@@ -221,7 +214,6 @@ func setupGoogle(cfg *config.Config) error {
 
 	fmt.Printf("\n  Authenticated as %s\n", email)
 
-	// Sync window.
 	var syncDays string
 	err = huh.NewForm(
 		huh.NewGroup(
@@ -247,7 +239,6 @@ func setupGWS(cfg *config.Config, services []string) error {
 	fmt.Printf("\n  -- Google Workspace Setup (%s) --\n", strings.Join(services, ", "))
 	fmt.Println("  These services are powered by gws (Google Workspace CLI).")
 
-	// Check for gws binary.
 	gwsPath, err := exec.LookPath("gws")
 	if err != nil {
 		fmt.Println("\n  Checking for gws... not found.")
@@ -273,7 +264,6 @@ func setupGWS(cfg *config.Config, services []string) error {
 		fmt.Printf("  gws found at %s\n", gwsPath)
 	}
 
-	// Share credentials with gws.
 	credPath := cfg.GoogleCredentialsFile()
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -295,7 +285,6 @@ func setupGWS(cfg *config.Config, services []string) error {
 	}
 	fmt.Printf("  Shared credentials with gws (%s)\n", gwsCredPath)
 
-	// Run gws auth login.
 	scopeArg := strings.Join(services, ",")
 	fmt.Println("\n  Opening browser for Google Workspace access...")
 	authCmd := exec.Command(gwsPath, "auth", "login", "--scopes", scopeArg)
@@ -307,7 +296,6 @@ func setupGWS(cfg *config.Config, services []string) error {
 	}
 	fmt.Println("  Google Workspace authenticated.")
 
-	// Save to config.
 	if cfg.Integrations == nil {
 		cfg.Integrations = &config.IntegrationsConfig{}
 	}
@@ -316,7 +304,6 @@ func setupGWS(cfg *config.Config, services []string) error {
 	}
 	cfg.Integrations.GWS.Enabled = true
 
-	// Merge with existing services.
 	existing := make(map[string]bool)
 	for _, s := range cfg.Integrations.GWS.Services {
 		existing[s] = true
@@ -369,7 +356,6 @@ func isGWSService(s string) bool {
 	return false
 }
 
-// cleanPath handles drag-and-drop paths that may have quotes and whitespace.
 func cleanPath(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.Trim(s, "'\"")

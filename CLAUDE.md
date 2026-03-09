@@ -1,3 +1,8 @@
+## Coding Guidelines
+
+  - Keep code simple and easy to read.
+  - Avoid excessive comments — only comment when absolutely necessary.
+
 ## Git Branch Rules
 
   - No slashes in branch names (e.g., use `fix-something` not `fix/something`).
