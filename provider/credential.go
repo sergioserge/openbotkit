@@ -48,6 +48,8 @@ func ResolveAPIKey(ref, envVar string) (string, error) {
 }
 
 // credentialLoad tries the OS keyring first, falls back to file-based storage.
+// Keyring errors are intentionally ignored to support headless/Docker environments
+// where no keyring daemon is available.
 func credentialLoad(service, account string) (string, error) {
 	val, err := keyring.Get(service, account)
 	if err == nil {
@@ -57,6 +59,8 @@ func credentialLoad(service, account string) (string, error) {
 }
 
 // credentialStore tries the OS keyring first, falls back to file-based storage.
+// Keyring errors are intentionally ignored to support headless/Docker environments
+// where no keyring daemon is available.
 func credentialStore(service, account, value string) error {
 	if err := keyring.Set(service, account, value); err == nil {
 		return nil
