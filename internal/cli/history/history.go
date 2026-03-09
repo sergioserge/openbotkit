@@ -1,10 +1,10 @@
-package memory
+package history
 
 import "github.com/spf13/cobra"
 
 var Cmd = &cobra.Command{
-	Use:   "memory",
-	Short: "Manage memory data source",
+	Use:   "history",
+	Short: "Manage conversation history",
 }
 
 func init() {

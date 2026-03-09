@@ -7,7 +7,7 @@ import (
 	applenotescli "github.com/priyanshujain/openbotkit/internal/cli/applenotes"
 	authcli "github.com/priyanshujain/openbotkit/internal/cli/auth"
 	"github.com/priyanshujain/openbotkit/internal/cli/gmail"
-	memorycli "github.com/priyanshujain/openbotkit/internal/cli/memory"
+	historycli "github.com/priyanshujain/openbotkit/internal/cli/history"
 	whatsappcli "github.com/priyanshujain/openbotkit/internal/cli/whatsapp"
 	"github.com/spf13/cobra"
 )
@@ -34,7 +34,7 @@ func init() {
 	rootCmd.AddCommand(authcli.Cmd)
 	rootCmd.AddCommand(serviceCmd)
 	rootCmd.AddCommand(gmail.Cmd)
-	rootCmd.AddCommand(memorycli.Cmd)
+	rootCmd.AddCommand(historycli.Cmd)
 	rootCmd.AddCommand(whatsappcli.Cmd)
 }
 
