@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/priyanshujain/openbotkit/source"
@@ -138,7 +138,7 @@ func resolveMessageIDs(db *store.DB, srv *gapi.Service, account string, opts Syn
 	ids, newHistoryID, err := FetchHistoryIDs(srv, state.HistoryID, limiter)
 	if err != nil {
 		if errors.Is(err, errHistoryExpired) {
-			log.Printf("History expired for %s, falling back to full search", account)
+			slog.Warn("history expired, falling back to full search", "account", account)
 			return fullSearch(srv, opts, limiter)
 		}
 		return nil, 0, err
@@ -188,21 +188,21 @@ func (g *Gmail) Sync(ctx context.Context, db *store.DB, opts SyncOptions) (*Sync
 	for _, email := range accounts {
 		httpClient, err := g.cfg.Provider.Client(ctx, email, []string{gapi.GmailReadonlyScope})
 		if err != nil {
-			log.Printf("Error getting client for %s: %v", email, err)
+			slog.Error("error getting client", "account", email, "error", err)
 			result.Errors++
 			continue
 		}
 
 		srv, err := newGmailService(ctx, httpClient)
 		if err != nil {
-			log.Printf("Error creating service for %s: %v", email, err)
+			slog.Error("error creating service", "account", email, "error", err)
 			result.Errors++
 			continue
 		}
 
 		msgIDs, newHistoryID, err := resolveMessageIDs(db, srv, email, opts, limiter)
 		if err != nil {
-			log.Printf("Error resolving messages for %s: %v", email, err)
+			slog.Error("error resolving messages", "account", email, "error", err)
 			result.Errors++
 			continue
 		}
@@ -212,7 +212,7 @@ func (g *Gmail) Sync(ctx context.Context, db *store.DB, opts SyncOptions) (*Sync
 		for _, id := range msgIDs {
 			exists, err := EmailExists(db, id, email)
 			if err != nil {
-				log.Printf("Error checking email %s: %v", id, err)
+				slog.Error("error checking email", "id", id, "error", err)
 				result.Errors++
 				continue
 			}
@@ -223,19 +223,19 @@ func (g *Gmail) Sync(ctx context.Context, db *store.DB, opts SyncOptions) (*Sync
 
 			fetched, err := FetchEmail(srv, email, id, limiter)
 			if err != nil {
-				log.Printf("Error fetching email %s: %v", id, err)
+				slog.Error("error fetching email", "id", id, "error", err)
 				result.Errors++
 				continue
 			}
 
 			if opts.DownloadAttachments && opts.AttachmentsDir != "" {
 				if err := SaveAttachments(fetched, opts.AttachmentsDir); err != nil {
-					log.Printf("Error saving attachments for %s: %v", id, err)
+					slog.Error("error saving attachments", "id", id, "error", err)
 				}
 			}
 
 			if _, err := SaveEmail(db, fetched); err != nil {
-				log.Printf("Error saving email %s: %v", id, err)
+				slog.Error("error saving email", "id", id, "error", err)
 				result.Errors++
 				continue
 			}
@@ -245,7 +245,7 @@ func (g *Gmail) Sync(ctx context.Context, db *store.DB, opts SyncOptions) (*Sync
 
 		if newHistoryID > 0 {
 			if err := SaveSyncState(db, email, newHistoryID); err != nil {
-				log.Printf("Error saving sync state for %s: %v", email, err)
+				slog.Error("error saving sync state", "account", email, "error", err)
 			}
 		}
 	}

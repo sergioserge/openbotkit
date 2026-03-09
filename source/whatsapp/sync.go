@@ -3,7 +3,7 @@ package whatsapp
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -32,13 +32,13 @@ func Sync(ctx context.Context, client *Client, db *store.DB, opts SyncOptions) (
 				return
 			}
 			if err := SaveMessage(db, msg); err != nil {
-				log.Printf("save message: %v", err)
+				slog.Error("save message", "error", err)
 				errors.Add(1)
 				return
 			}
 			UpsertChat(db, msg.ChatJID, chatName(evt), msg.IsGroup)
 			received.Add(1)
-			log.Printf("message from %s in %s: %s", msg.SenderName, msg.ChatJID, truncate(msg.Text, 80))
+			slog.Info("message received", "sender", msg.SenderName, "chat", msg.ChatJID, "text", truncate(msg.Text, 80))
 
 		case *events.HistorySync:
 			for _, conv := range evt.Data.GetConversations() {
@@ -62,17 +62,17 @@ func Sync(ctx context.Context, client *Client, db *store.DB, opts SyncOptions) (
 					historyMsgs.Add(1)
 				}
 			}
-			log.Printf("history sync: %d conversations processed", len(evt.Data.GetConversations()))
+			slog.Info("history sync", "conversations", len(evt.Data.GetConversations()))
 
 		case *events.Connected:
-			log.Println("connected to whatsapp")
+			slog.Info("connected to whatsapp")
 
 		case *events.Disconnected:
-			log.Println("disconnected from whatsapp")
+			slog.Warn("disconnected from whatsapp")
 			if opts.Follow {
 				go func() {
 					if err := client.ReconnectWithBackoff(ctx); err != nil {
-						log.Printf("reconnect failed: %v", err)
+						slog.Error("reconnect failed", "error", err)
 					}
 				}()
 			}
@@ -106,19 +106,19 @@ func syncContacts(ctx context.Context, client *Client, db *store.DB) {
 
 	contacts, err := client.GetAllContacts(ctx)
 	if err != nil {
-		log.Printf("sync contacts: %v", err)
+		slog.Error("sync contacts", "error", err)
 		return
 	}
 
 	var saved int
 	for _, c := range contacts {
 		if err := SaveContact(db, &c); err != nil {
-			log.Printf("save contact %s: %v", c.JID, err)
+			slog.Error("save contact", "jid", c.JID, "error", err)
 			continue
 		}
 		saved++
 	}
-	log.Printf("contacts synced: %d/%d", saved, len(contacts))
+	slog.Info("contacts synced", "saved", saved, "total", len(contacts))
 }
 
 func parseMessage(evt *events.Message) *Message {
