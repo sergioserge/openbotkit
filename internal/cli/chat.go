@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"github.com/priyanshujain/openbotkit/config"
 	"github.com/priyanshujain/openbotkit/internal/skills"
 	"github.com/priyanshujain/openbotkit/provider"
+	historysrc "github.com/priyanshujain/openbotkit/source/history"
+	"github.com/priyanshujain/openbotkit/store"
 
 	// Register provider factories.
 	_ "github.com/priyanshujain/openbotkit/provider/anthropic"
@@ -53,6 +56,15 @@ var chatCmd = &cobra.Command{
 
 		_ = router // Will be used for tier-based routing later.
 
+		// Open history DB for saving conversation.
+		histDB, convID, err := openHistoryDB(cfg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: history will not be saved: %v\n", err)
+		}
+		if histDB != nil {
+			defer histDB.Close()
+		}
+
 		// Build tool registry.
 		toolReg := tools.NewRegistry()
 		toolReg.Register(tools.NewBashTool(30 * time.Second))
@@ -90,10 +102,50 @@ var chatCmd = &cobra.Command{
 				continue
 			}
 
+			if histDB != nil {
+				historysrc.SaveMessage(histDB, convID, "user", input)
+				historysrc.SaveMessage(histDB, convID, "assistant", response)
+			}
+
 			ch.Send(response)
 			fmt.Println()
 		}
 	},
+}
+
+func openHistoryDB(cfg *config.Config) (*store.DB, int64, error) {
+	if err := config.EnsureSourceDir("history"); err != nil {
+		return nil, 0, fmt.Errorf("ensure history dir: %w", err)
+	}
+
+	db, err := store.Open(store.Config{
+		Driver: cfg.History.Storage.Driver,
+		DSN:    cfg.HistoryDataDSN(),
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("open history db: %w", err)
+	}
+
+	if err := historysrc.Migrate(db); err != nil {
+		db.Close()
+		return nil, 0, fmt.Errorf("migrate history: %w", err)
+	}
+
+	sessionID := generateSessionID()
+	cwd, _ := os.Getwd()
+	convID, err := historysrc.UpsertConversation(db, sessionID, cwd)
+	if err != nil {
+		db.Close()
+		return nil, 0, fmt.Errorf("create conversation: %w", err)
+	}
+
+	return db, convID, nil
+}
+
+func generateSessionID() string {
+	var b [16]byte
+	rand.Read(b[:])
+	return fmt.Sprintf("obk-chat-%x", b[:])
 }
 
 func buildSystemPrompt() string {
