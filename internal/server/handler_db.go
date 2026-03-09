@@ -1,12 +1,13 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
-	"fmt"
+	"log/slog"
 	"net/http"
-	"os"
-	"os/exec"
 	"strings"
+
+	_ "modernc.org/sqlite"
 )
 
 type dbRequest struct {
@@ -37,52 +38,78 @@ func (s *Server) handleDB(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "only SELECT queries are allowed")
 		return
 	}
+	if strings.Contains(req.SQL, ";") {
+		writeError(w, http.StatusBadRequest, "multiple statements are not allowed")
+		return
+	}
 
 	dsn, err := s.cfg.SourceDataDSN(source)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeError(w, http.StatusBadRequest, "unknown source")
 		return
 	}
 
-	if _, err := os.Stat(dsn); err != nil {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("database not found: %s", dsn))
-		return
-	}
-
-	sqlite3, err := exec.LookPath("sqlite3")
+	// Open in read-only mode to prevent any writes.
+	db, err := sql.Open("sqlite", dsn+"?mode=ro")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "sqlite3 not found on server")
+		slog.Error("db handler: open database", "source", source, "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to open database")
 		return
 	}
+	defer db.Close()
 
-	cmd := exec.CommandContext(r.Context(), sqlite3, "-header", "-separator", "\t", dsn, req.SQL)
-	out, err := cmd.Output()
+	rows, err := db.QueryContext(r.Context(), req.SQL)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("query error: %v", err))
+		slog.Error("db handler: query", "source", source, "error", err)
+		writeError(w, http.StatusBadRequest, "query failed")
+		return
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		slog.Error("db handler: columns", "source", source, "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to read columns")
 		return
 	}
 
-	resp := parseTabOutput(string(out))
+	var result [][]string
+	for rows.Next() {
+		vals := make([]sql.NullString, len(columns))
+		ptrs := make([]any, len(columns))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			slog.Error("db handler: scan row", "source", source, "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to read row")
+			return
+		}
+		row := make([]string, len(columns))
+		for i, v := range vals {
+			if v.Valid {
+				row[i] = v.String
+			}
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		slog.Error("db handler: rows iteration", "source", source, "error", err)
+		writeError(w, http.StatusInternalServerError, "query error")
+		return
+	}
+
+	if result == nil {
+		result = [][]string{}
+	}
+
+	resp := dbResponse{Columns: columns, Rows: result}
+	if resp.Columns == nil {
+		resp.Columns = []string{}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
-}
-
-func parseTabOutput(raw string) dbResponse {
-	lines := strings.Split(strings.TrimSpace(raw), "\n")
-	if len(lines) == 0 || lines[0] == "" {
-		return dbResponse{Columns: []string{}, Rows: [][]string{}}
-	}
-
-	columns := strings.Split(lines[0], "\t")
-	rows := make([][]string, 0, len(lines)-1)
-	for _, line := range lines[1:] {
-		if line == "" {
-			continue
-		}
-		rows = append(rows, strings.Split(line, "\t"))
-	}
-
-	return dbResponse{Columns: columns, Rows: rows}
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
