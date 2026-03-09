@@ -1,0 +1,59 @@
+package memory
+
+import (
+	"fmt"
+
+	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/memory"
+	"github.com/priyanshujain/openbotkit/store"
+	"github.com/spf13/cobra"
+)
+
+var (
+	addCategory string
+	addSource   string
+)
+
+var addCmd = &cobra.Command{
+	Use:   "add <content>",
+	Short: "Add a personal memory",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		content := args[0]
+
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
+
+		if err := config.EnsureSourceDir("user_memory"); err != nil {
+			return fmt.Errorf("ensure user_memory dir: %w", err)
+		}
+
+		db, err := store.Open(store.Config{
+			Driver: cfg.UserMemory.Storage.Driver,
+			DSN:    cfg.UserMemoryDataDSN(),
+		})
+		if err != nil {
+			return fmt.Errorf("open database: %w", err)
+		}
+		defer db.Close()
+
+		if err := memory.Migrate(db); err != nil {
+			return fmt.Errorf("migrate: %w", err)
+		}
+
+		id, err := memory.Add(db, content, memory.Category(addCategory), addSource, "")
+		if err != nil {
+			return fmt.Errorf("add: %w", err)
+		}
+
+		fmt.Printf("Added memory #%d\n", id)
+		return nil
+	},
+}
+
+func init() {
+	addCmd.Flags().StringVar(&addCategory, "category", "preference", "category (identity, preference, relationship, project)")
+	addCmd.Flags().StringVar(&addSource, "source", "manual", "source of the memory")
+}
