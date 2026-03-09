@@ -12,13 +12,29 @@ import (
 )
 
 type Daemon struct {
-	cfg   *config.Config
-	river *river.Client[*sql.Tx]
-	jobsDB *sql.DB
+	cfg            *config.Config
+	river          *river.Client[*sql.Tx]
+	jobsDB         *sql.DB
+	skipAppleNotes bool
+	skipWhatsApp   bool
 }
 
-func New(cfg *config.Config) *Daemon {
-	return &Daemon{cfg: cfg}
+type Option func(*Daemon)
+
+func WithSkipAppleNotes() Option {
+	return func(d *Daemon) { d.skipAppleNotes = true }
+}
+
+func WithSkipWhatsApp() Option {
+	return func(d *Daemon) { d.skipWhatsApp = true }
+}
+
+func New(cfg *config.Config, opts ...Option) *Daemon {
+	d := &Daemon{cfg: cfg}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
 }
 
 func (d *Daemon) Run(ctx context.Context) error {
@@ -47,19 +63,28 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	log.Println("river job queue started")
 
-	waErrCh := runWhatsAppSync(ctx, d.cfg)
-	anErrCh := runAppleNotesSync(ctx, d.cfg)
+	var waErrCh, anErrCh <-chan error
+	if !d.skipWhatsApp {
+		waErrCh = runWhatsAppSync(ctx, d.cfg)
+	}
+	if !d.skipAppleNotes {
+		anErrCh = runAppleNotesSync(ctx, d.cfg)
+	}
 
 	// Block until context is cancelled (signal received).
 	<-ctx.Done()
 	log.Println("shutting down daemon")
 
 	// Drain sync errors.
-	if err := <-waErrCh; err != nil {
-		log.Printf("whatsapp error during shutdown: %v", err)
+	if waErrCh != nil {
+		if err := <-waErrCh; err != nil {
+			log.Printf("whatsapp error during shutdown: %v", err)
+		}
 	}
-	if err := <-anErrCh; err != nil {
-		log.Printf("applenotes error during shutdown: %v", err)
+	if anErrCh != nil {
+		if err := <-anErrCh; err != nil {
+			log.Printf("applenotes error during shutdown: %v", err)
+		}
 	}
 
 	if err := d.river.Stop(context.Background()); err != nil {
