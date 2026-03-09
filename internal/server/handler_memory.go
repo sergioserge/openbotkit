@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -63,7 +64,8 @@ func (s *Server) handleMemoryList(w http.ResponseWriter, r *http.Request) {
 		memories, err = memory.List(db)
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("list memories: %v", err))
+		slog.Error("memory handler: list", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to list memories")
 		return
 	}
 
@@ -109,7 +111,8 @@ func (s *Server) handleMemoryAdd(w http.ResponseWriter, r *http.Request) {
 
 	id, err := memory.Add(db, req.Content, memory.Category(req.Category), req.Source, "")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("add memory: %v", err))
+		slog.Error("memory handler: add", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to add memory")
 		return
 	}
 
@@ -134,7 +137,8 @@ func (s *Server) handleMemoryDelete(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	if err := memory.Delete(db, id); err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("delete memory: %v", err))
+		slog.Error("memory handler: delete", "id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to delete memory")
 		return
 	}
 
@@ -167,14 +171,16 @@ func (s *Server) handleMemoryExtract(w http.ResponseWriter, r *http.Request) {
 		DSN:    s.cfg.HistoryDataDSN(),
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("open history db: %v", err))
+		slog.Error("memory extract handler: open history db", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to open history database")
 		return
 	}
 	defer histDB.Close()
 
 	messages, err := loadRecentMessages(histDB, req.Last)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("load messages: %v", err))
+		slog.Error("memory extract handler: load messages", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to load messages")
 		return
 	}
 
@@ -193,14 +199,16 @@ func (s *Server) handleMemoryExtract(w http.ResponseWriter, r *http.Request) {
 
 	llm, err := s.buildLLM()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build LLM: %v", err))
+		slog.Error("memory extract handler: build LLM", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to initialize LLM")
 		return
 	}
 
 	ctx := r.Context()
 	candidates, err := memory.Extract(ctx, llm, messages)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("extract: %v", err))
+		slog.Error("memory extract handler: extract", "error", err)
+		writeError(w, http.StatusInternalServerError, "memory extraction failed")
 		return
 	}
 
@@ -212,7 +220,8 @@ func (s *Server) handleMemoryExtract(w http.ResponseWriter, r *http.Request) {
 
 	result, err := memory.Reconcile(ctx, memDB, llm, candidates)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("reconcile: %v", err))
+		slog.Error("memory extract handler: reconcile", "error", err)
+		writeError(w, http.StatusInternalServerError, "memory reconciliation failed")
 		return
 	}
 

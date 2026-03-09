@@ -2,7 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -34,13 +34,15 @@ func (s *Server) handleAppleNotesPush(w http.ResponseWriter, r *http.Request) {
 		DSN:    s.cfg.AppleNotesDataDSN(),
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("open db: %v", err))
+		slog.Error("applenotes handler: open db", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to open database")
 		return
 	}
 	defer db.Close()
 
 	if err := ansrc.Migrate(db); err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("migrate: %v", err))
+		slog.Error("applenotes handler: migrate", "error", err)
+		writeError(w, http.StatusInternalServerError, "database migration failed")
 		return
 	}
 
@@ -61,7 +63,8 @@ func (s *Server) handleAppleNotesPush(w http.ResponseWriter, r *http.Request) {
 			ModifiedAt:        modifiedAt,
 		}
 		if err := ansrc.SaveNote(db, note); err != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("save note: %v", err))
+			slog.Error("applenotes handler: save note", "apple_id", n.AppleID, "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to save note")
 			return
 		}
 		saved++

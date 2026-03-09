@@ -2,7 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 
@@ -48,7 +48,8 @@ func (s *Server) handleGmailSend(w http.ResponseWriter, r *http.Request) {
 		Account: req.Account,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("send failed: %v", err))
+		slog.Error("gmail handler: send", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to send email")
 		return
 	}
 
@@ -87,7 +88,8 @@ func (s *Server) handleGmailDraft(w http.ResponseWriter, r *http.Request) {
 		Account: req.Account,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("create draft failed: %v", err))
+		slog.Error("gmail handler: create draft", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to create draft")
 		return
 	}
 
@@ -124,7 +126,8 @@ func (s *Server) handleGmailSync(w http.ResponseWriter, r *http.Request) {
 		DSN:    s.cfg.GmailDataDSN(),
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("open db: %v", err))
+		slog.Error("gmail handler: open db", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to open database")
 		return
 	}
 	defer db.Close()
@@ -141,7 +144,8 @@ func (s *Server) handleGmailSync(w http.ResponseWriter, r *http.Request) {
 		AttachmentsDir:      attachDir,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("sync failed: %v", err))
+		slog.Error("gmail handler: sync", "error", err)
+		writeError(w, http.StatusInternalServerError, "sync failed")
 		return
 	}
 

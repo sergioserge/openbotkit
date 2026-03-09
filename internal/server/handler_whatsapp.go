@@ -2,7 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
+	"log/slog"
 	"net/http"
 
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
@@ -37,7 +37,8 @@ func (s *Server) handleWhatsAppSend(w http.ResponseWriter, r *http.Request) {
 
 	client, err := wasrc.NewClient(r.Context(), s.cfg.WhatsAppSessionDBPath())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("create client: %v", err))
+		slog.Error("whatsapp handler: create client", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to create WhatsApp client")
 		return
 	}
 	defer client.Disconnect()
@@ -52,13 +53,15 @@ func (s *Server) handleWhatsAppSend(w http.ResponseWriter, r *http.Request) {
 		DSN:    s.cfg.WhatsAppDataDSN(),
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("open db: %v", err))
+		slog.Error("whatsapp handler: open db", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to open database")
 		return
 	}
 	defer db.Close()
 
 	if err := wasrc.Migrate(db); err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("migrate: %v", err))
+		slog.Error("whatsapp handler: migrate", "error", err)
+		writeError(w, http.StatusInternalServerError, "database migration failed")
 		return
 	}
 
@@ -67,7 +70,8 @@ func (s *Server) handleWhatsAppSend(w http.ResponseWriter, r *http.Request) {
 		Text:    req.Text,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("send failed: %v", err))
+		slog.Error("whatsapp handler: send", "to", req.To, "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to send message")
 		return
 	}
 
