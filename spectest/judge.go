@@ -20,7 +20,9 @@ func AssertJudge(t *testing.T, p provider.Provider, model string, prompt, respon
 2. The AI assistant's response
 3. Success criteria
 
-Evaluate whether the response satisfies ALL of the criteria. Be strict — the response must clearly demonstrate each criterion, not just vaguely hint at it.
+The assistant had access to real databases (email, WhatsApp, memories) via tool calls.
+The details in the response (names, dates, email addresses, subjects) come from those databases — they are NOT hallucinated.
+Your job is ONLY to check whether the response covers the topics described in the criteria.
 
 Respond with exactly one line: "PASS" or "FAIL"
 Then on the next line, a brief explanation (1-2 sentences).
