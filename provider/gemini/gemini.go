@@ -219,16 +219,21 @@ func convertMessage(m provider.Message) []map[string]any {
 		role = "model"
 	}
 
-	var parts []map[string]any
+	// Check if this message contains tool results — Gemini requires
+	// functionResponse parts in a separate "user" content with all
+	// results grouped together.
+	var funcResponseParts []map[string]any
+	var otherParts []map[string]any
+
 	for _, block := range m.Content {
 		switch block.Type {
 		case provider.ContentText:
-			parts = append(parts, map[string]any{"text": block.Text})
+			otherParts = append(otherParts, map[string]any{"text": block.Text})
 		case provider.ContentToolUse:
 			if block.ToolCall != nil {
 				var args map[string]any
 				_ = json.Unmarshal(block.ToolCall.Input, &args)
-				parts = append(parts, map[string]any{
+				otherParts = append(otherParts, map[string]any{
 					"functionCall": map[string]any{
 						"name": block.ToolCall.Name,
 						"args": args,
@@ -237,28 +242,46 @@ func convertMessage(m provider.Message) []map[string]any {
 			}
 		case provider.ContentToolResult:
 			if block.ToolResult != nil {
-				// Gemini expects functionResponse in a separate "user" content.
 				var response map[string]any
 				if err := json.Unmarshal([]byte(block.ToolResult.Content), &response); err != nil {
 					response = map[string]any{"result": block.ToolResult.Content}
 				}
-				return []map[string]any{{
-					"role": "user",
-					"parts": []map[string]any{{
-						"functionResponse": map[string]any{
-							"name":     block.ToolResult.ToolUseID,
-							"response": response,
-						},
-					}},
-				}}
+				// Gemini matches functionResponse by function name, not by call ID.
+				name := block.ToolResult.Name
+				if name == "" {
+					name = block.ToolResult.ToolUseID
+				}
+				funcResponseParts = append(funcResponseParts, map[string]any{
+					"functionResponse": map[string]any{
+						"name":     name,
+						"response": response,
+					},
+				})
 			}
 		}
 	}
 
-	return []map[string]any{{
-		"role":  role,
-		"parts": parts,
-	}}
+	var result []map[string]any
+	if len(otherParts) > 0 {
+		result = append(result, map[string]any{
+			"role":  role,
+			"parts": otherParts,
+		})
+	}
+	if len(funcResponseParts) > 0 {
+		result = append(result, map[string]any{
+			"role":  "user",
+			"parts": funcResponseParts,
+		})
+	}
+	if len(result) == 0 {
+		result = append(result, map[string]any{
+			"role":  role,
+			"parts": []map[string]any{},
+		})
+	}
+
+	return result
 }
 
 func (g *Gemini) doRequest(ctx context.Context, url string, body map[string]any) (io.ReadCloser, error) {
