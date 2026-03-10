@@ -27,6 +27,7 @@ type Config struct {
 	WhatsApp     *WhatsAppConfig     `yaml:"whatsapp,omitempty"`
 	History      *HistoryConfig      `yaml:"history,omitempty"`
 	AppleNotes   *AppleNotesConfig   `yaml:"applenotes,omitempty"`
+	IMessage     *IMessageConfig     `yaml:"imessage,omitempty"`
 	UserMemory   *UserMemoryConfig   `yaml:"user_memory,omitempty"`
 	Daemon       *DaemonConfig       `yaml:"daemon,omitempty"`
 	Integrations *IntegrationsConfig `yaml:"integrations,omitempty"`
@@ -125,6 +126,10 @@ type AppleNotesConfig struct {
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
 
+type IMessageConfig struct {
+	Storage StorageConfig `yaml:"storage,omitempty"`
+}
+
 type StorageConfig struct {
 	Driver string `yaml:"driver,omitempty"` // "sqlite" or "postgres"
 	DSN    string `yaml:"dsn,omitempty"`
@@ -142,8 +147,10 @@ func (c *Config) SourceDataDSN(source string) (string, error) {
 		return c.UserMemoryDataDSN(), nil
 	case "applenotes":
 		return c.AppleNotesDataDSN(), nil
+	case "imessage":
+		return c.IMessageDataDSN(), nil
 	default:
-		return "", fmt.Errorf("unknown source: %q (valid: gmail, whatsapp, history, user_memory, applenotes)", source)
+		return "", fmt.Errorf("unknown source: %q (valid: gmail, whatsapp, history, user_memory, applenotes, imessage)", source)
 	}
 }
 
@@ -217,6 +224,11 @@ func Default() *Config {
 				Driver: "sqlite",
 			},
 		},
+		IMessage: &IMessageConfig{
+			Storage: StorageConfig{
+				Driver: "sqlite",
+			},
+		},
 	}
 	cfg.applyDefaults()
 	return cfg
@@ -255,6 +267,12 @@ func (c *Config) applyDefaults() {
 	}
 	if c.AppleNotes.Storage.Driver == "" {
 		c.AppleNotes.Storage.Driver = "sqlite"
+	}
+	if c.IMessage == nil {
+		c.IMessage = &IMessageConfig{}
+	}
+	if c.IMessage.Storage.Driver == "" {
+		c.IMessage.Storage.Driver = "sqlite"
 	}
 	if c.Daemon == nil {
 		c.Daemon = &DaemonConfig{}
@@ -301,6 +319,13 @@ func (c *Config) AppleNotesDataDSN() string {
 		return c.AppleNotes.Storage.DSN
 	}
 	return filepath.Join(SourceDir("applenotes"), "data.db")
+}
+
+func (c *Config) IMessageDataDSN() string {
+	if c.IMessage.Storage.DSN != "" {
+		return c.IMessage.Storage.DSN
+	}
+	return filepath.Join(SourceDir("imessage"), "data.db")
 }
 
 func (c *Config) JobsDBDSN() string {
