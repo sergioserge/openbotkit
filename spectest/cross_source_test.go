@@ -15,29 +15,36 @@ func TestSpec_SummarizeCommunicationsAcrossSources(t *testing.T) {
 
 	fx.GivenEmails(t, []Email{
 		{From: "alice@acme.com", To: "me@example.com", Subject: "Q3 Budget Review", Body: "Hi, please review the Q3 budget spreadsheet I shared. We need to finalize numbers by Friday."},
-		{From: "alice@acme.com", To: "me@example.com", Subject: "Team Offsite Planning", Body: "I'm thinking we do the offsite in Portland in October. Thoughts?"},
+		{From: "alice@acme.com", To: "me@example.com", Subject: "Team Offsite in Portland", Body: "I'm thinking we do the offsite in Portland in October. Thoughts?"},
 	})
 
 	fx.GivenWhatsAppMessages(t, []WhatsAppMessage{
-		{SenderJID: "alice@s.whatsapp.net", SenderName: "Alice", ChatJID: "alice@s.whatsapp.net", ChatName: "Alice", Text: "Hey, did you see my email about the Q3 budget? Let me know if the numbers look right."},
-		{SenderJID: "alice@s.whatsapp.net", SenderName: "Alice", ChatJID: "alice@s.whatsapp.net", ChatName: "Alice", Text: "Also I booked the restaurant for Friday dinner. Italian place downtown."},
-		{SenderJID: "me@s.whatsapp.net", SenderName: "Me", ChatJID: "alice@s.whatsapp.net", ChatName: "Alice", Text: "Sounds great! I'll review the budget tonight.", IsFromMe: true},
+		{SenderJID: "alice@s.whatsapp.net", SenderName: "Alice", ChatJID: "alice@s.whatsapp.net", ChatName: "Alice", Text: "Booked Trattoria Vecchia for Friday dinner, confirmation code TRV-8842."},
+		{SenderJID: "alice@s.whatsapp.net", SenderName: "Alice", ChatJID: "alice@s.whatsapp.net", ChatName: "Alice", Text: "Can you bring the Nakamura prototype to the offsite? Serial number NK-2047."},
 	})
 
 	a := fx.Agent(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
-	prompt := "Summarize all my recent communications with Alice across email and WhatsApp."
+	// First turn: query WhatsApp
+	_, err := a.Run(ctx, "Load the whatsapp-read skill and search WhatsApp messages from Alice. Report what you find.")
+	if err != nil {
+		t.Fatalf("agent.Run (WhatsApp): %v", err)
+	}
+
+	// Second turn: query email and combine with prior WhatsApp findings
+	prompt := "Now load the email-read skill and search emails from Alice. Then give me a combined summary of everything you found about Alice across both WhatsApp and email."
 	result, err := a.Run(ctx, prompt)
 	if err != nil {
-		t.Fatalf("agent.Run: %v", err)
+		t.Fatalf("agent.Run (email): %v", err)
 	}
 
 	AssertNotEmpty(t, result)
 	AssertJudge(t, fx.Provider, fx.Model, prompt, result,
 		"The response must cover topics from BOTH email and WhatsApp. "+
-			"It should mention the Q3 budget review from email AND the restaurant/dinner plans from WhatsApp. "+
+			"It should mention the Q3 budget review or Portland offsite from email, AND reference "+
+			"Trattoria Vecchia, TRV-8842, Nakamura prototype, or NK-2047 from WhatsApp. "+
 			"It should not claim that data from one source is missing if it was provided.")
 }
 
@@ -49,31 +56,36 @@ func TestSpec_RecallMemoryAndCorrelateEmails(t *testing.T) {
 	fx := NewLocalFixture(t)
 
 	fx.GivenMemories(t, []UserMemory{
-		{Content: "Alice Chen is my project manager at Acme Corp", Category: "relationship"},
-		{Content: "The Horizon project has a hard deadline of March 30, 2025", Category: "project"},
-		{Content: "Alice prefers async communication over meetings", Category: "relationship"},
+		{Content: "Raj Patel is my tech lead at Zephyr Industries", Category: "relationship"},
+		{Content: "Project Firebird has a hard deadline of June 15, 2025", Category: "project"},
 	})
 
 	fx.GivenEmails(t, []Email{
-		{From: "alice.chen@acme.com", To: "me@example.com", Subject: "Horizon Milestone 3 Update", Body: "Milestone 3 is due March 15. We need the API integration tests complete by then. Please prioritize this."},
-		{From: "alice.chen@acme.com", To: "me@example.com", Subject: "Re: Horizon Timeline", Body: "The client moved the final demo to March 28. We have two days less than planned."},
-		{From: "bob@acme.com", To: "me@example.com", Subject: "Unrelated standup notes", Body: "Here are the standup notes from today."},
+		{From: "raj.patel@zephyr.io", To: "me@example.com", Subject: "Project Firebird Sprint 7 Retro", Body: "Sprint 7 retro is scheduled for May 22. Please prepare your notes on the auth module refactor."},
+		{From: "raj.patel@zephyr.io", To: "me@example.com", Subject: "Project Firebird Launch Prep", Body: "Client confirmed the staging demo for June 10. We need all QA passed by June 8."},
 	})
 
 	a := fx.Agent(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
-	prompt := "What do I know about Alice and the Horizon project? What are the upcoming deadlines?"
+	// First turn: query memories
+	_, err := a.Run(ctx, "Run 'obk memory list' and tell me what memories are stored.")
+	if err != nil {
+		t.Fatalf("agent.Run (memory): %v", err)
+	}
+
+	// Second turn: query emails and combine
+	prompt := "Now load the email-read skill and search emails from Raj. Give me a combined summary of everything about Raj and Project Firebird from both memories and emails."
 	result, err := a.Run(ctx, prompt)
 	if err != nil {
-		t.Fatalf("agent.Run: %v", err)
+		t.Fatalf("agent.Run (email): %v", err)
 	}
 
 	AssertNotEmpty(t, result)
 	AssertJudge(t, fx.Provider, fx.Model, prompt, result,
 		"The response must include information from BOTH memories and emails. "+
-			"It should mention Alice is the project manager (from memory) AND reference specific deadlines "+
-			"like March 15 for Milestone 3 or March 28 for the demo (from emails). "+
+			"It should mention Raj Patel is the tech lead at Zephyr Industries (from memory) AND mention "+
+			"email subjects or content about Project Firebird Sprint 7 and Launch Prep (from emails). "+
 			"It should not only use one source.")
 }
