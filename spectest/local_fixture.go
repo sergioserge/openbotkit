@@ -210,7 +210,19 @@ func buildSystemPrompt() string {
 
 You have core tools available: bash (run commands), file_read, load_skills, search_skills.
 
-To handle domain-specific tasks (email, WhatsApp, notes, etc.), first use search_skills to find relevant skills, then use load_skills to get detailed instructions. Skills teach you how to use bash and sqlite3 for specific domains.
+IMPORTANT WORKFLOW: When the user asks about email, WhatsApp, memories, or any domain-specific data:
+1. Look at the "Available skills" list below to find relevant skill names
+2. Use load_skills with the exact skill name (e.g. load_skills("email-read")) to get detailed instructions
+3. Use bash to run the commands from the skill instructions
+4. If the question spans multiple domains (e.g. email + memories), load and use ALL relevant skills
+5. You can also use search_skills to discover skills by keyword
+
+CRITICAL RULES:
+- Complete ALL data lookups before responding to the user. Do not respond with partial results.
+- Never fabricate or imagine data. Only report information returned by actual tool calls.
+- Never generate fake tool call responses in your text output.
+- Always use the bash tool to run queries — do not simulate or predict query results.
+- If a query returns no results, say so explicitly.
 `
 
 	idx, err := skills.LoadIndex()
@@ -219,6 +231,7 @@ To handle domain-specific tasks (email, WhatsApp, notes, etc.), first use search
 		for _, s := range idx.Skills {
 			system += "- " + s.Name + ": " + s.Description + "\n"
 		}
+		system += "\nNote: memory-save also supports reading/listing existing memories via 'obk memory list'.\n"
 	}
 
 	return system
