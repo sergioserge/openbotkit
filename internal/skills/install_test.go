@@ -423,6 +423,56 @@ func TestInstallRemovesRevokedSkills(t *testing.T) {
 	}
 }
 
+func TestSplitSkillFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantSlim string
+		wantRef  string
+	}{
+		{
+			name:     "no frontmatter",
+			input:    "Just some content",
+			wantSlim: "Just some content",
+			wantRef:  "",
+		},
+		{
+			name:     "frontmatter only",
+			input:    "---\nname: test\n---\n",
+			wantSlim: "---\nname: test\n---\n",
+			wantRef:  "",
+		},
+		{
+			name:     "single paragraph body",
+			input:    "---\nname: test\n---\n\nJust a summary line.",
+			wantSlim: "---\nname: test\n---\n\nJust a summary line.",
+			wantRef:  "",
+		},
+		{
+			name:  "multi paragraph body",
+			input: "---\nname: test\ndescription: Test skill\n---\n\nFirst paragraph summary.\n\n## Commands\n\n```bash\nsome command\n```\n\n## Examples\n\nMore content here.",
+			wantSlim: "---\nname: test\ndescription: Test skill\n---\n\nFirst paragraph summary.\n\n" +
+				"Read the REFERENCE.md in this skill's directory for full instructions.\n",
+			wantRef: "## Commands\n\n```bash\nsome command\n```\n\n## Examples\n\nMore content here.\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			slim, ref := splitSkillFile([]byte(tt.input))
+			if string(slim) != tt.wantSlim {
+				t.Errorf("slim:\ngot:  %q\nwant: %q", string(slim), tt.wantSlim)
+			}
+			if string(ref) != tt.wantRef {
+				if tt.wantRef == "" && ref == nil {
+					return // nil and "" are equivalent for empty ref
+				}
+				t.Errorf("ref:\ngot:  %q\nwant: %q", string(ref), tt.wantRef)
+			}
+		})
+	}
+}
+
 func TestInstallIdempotent(t *testing.T) {
 	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
 
