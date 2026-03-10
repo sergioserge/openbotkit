@@ -50,6 +50,73 @@ func TestToolCalls_Empty(t *testing.T) {
 	}
 }
 
+func TestEffectiveSystemBlocks_FromBlocks(t *testing.T) {
+	req := &ChatRequest{
+		SystemBlocks: []SystemBlock{
+			{Text: "block1", CacheControl: &CacheControl{Type: "ephemeral"}},
+			{Text: "block2"},
+		},
+		System: "should be ignored",
+	}
+	blocks := req.EffectiveSystemBlocks()
+	if len(blocks) != 2 {
+		t.Fatalf("got %d blocks, want 2", len(blocks))
+	}
+	if blocks[0].Text != "block1" || blocks[0].CacheControl == nil {
+		t.Errorf("block 0 = %+v", blocks[0])
+	}
+	if blocks[1].Text != "block2" || blocks[1].CacheControl != nil {
+		t.Errorf("block 1 = %+v", blocks[1])
+	}
+}
+
+func TestEffectiveSystemBlocks_FromString(t *testing.T) {
+	req := &ChatRequest{System: "hello system"}
+	blocks := req.EffectiveSystemBlocks()
+	if len(blocks) != 1 {
+		t.Fatalf("got %d blocks, want 1", len(blocks))
+	}
+	if blocks[0].Text != "hello system" {
+		t.Errorf("text = %q", blocks[0].Text)
+	}
+	if blocks[0].CacheControl != nil {
+		t.Error("expected no cache control for plain System string")
+	}
+}
+
+func TestEffectiveSystemBlocks_Empty(t *testing.T) {
+	req := &ChatRequest{}
+	if blocks := req.EffectiveSystemBlocks(); len(blocks) != 0 {
+		t.Errorf("got %d blocks, want 0", len(blocks))
+	}
+}
+
+func TestFullSystemText_Blocks(t *testing.T) {
+	req := &ChatRequest{
+		SystemBlocks: []SystemBlock{
+			{Text: "part1"},
+			{Text: "part2"},
+		},
+	}
+	if text := req.FullSystemText(); text != "part1part2" {
+		t.Errorf("text = %q, want %q", text, "part1part2")
+	}
+}
+
+func TestFullSystemText_String(t *testing.T) {
+	req := &ChatRequest{System: "hello"}
+	if text := req.FullSystemText(); text != "hello" {
+		t.Errorf("text = %q", text)
+	}
+}
+
+func TestFullSystemText_Empty(t *testing.T) {
+	req := &ChatRequest{}
+	if text := req.FullSystemText(); text != "" {
+		t.Errorf("text = %q, want empty", text)
+	}
+}
+
 func TestToolCalls_Multiple(t *testing.T) {
 	resp := &ChatResponse{
 		Content: []ContentBlock{

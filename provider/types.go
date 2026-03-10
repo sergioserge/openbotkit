@@ -1,6 +1,9 @@
 package provider
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // Role represents a message participant.
 type Role string
@@ -74,13 +77,53 @@ type Tool struct {
 	InputSchema json.RawMessage `json:"input_schema"`
 }
 
+// CacheControl marks a content block for provider-level prompt caching.
+type CacheControl struct {
+	Type string `json:"type"` // "ephemeral"
+}
+
+// SystemBlock is a structured system prompt segment with optional cache control.
+type SystemBlock struct {
+	Text         string        `json:"text"`
+	CacheControl *CacheControl `json:"cache_control,omitempty"`
+}
+
 // ChatRequest is the input to Provider.Chat and Provider.StreamChat.
 type ChatRequest struct {
-	Model     string    `json:"model"`
-	System    string    `json:"system,omitempty"`
-	Messages  []Message `json:"messages"`
-	Tools     []Tool    `json:"tools,omitempty"`
-	MaxTokens int       `json:"max_tokens,omitempty"`
+	Model        string        `json:"model"`
+	System       string        `json:"system,omitempty"`
+	SystemBlocks []SystemBlock `json:"system_blocks,omitempty"`
+	Messages     []Message     `json:"messages"`
+	Tools        []Tool        `json:"tools,omitempty"`
+	MaxTokens    int           `json:"max_tokens,omitempty"`
+}
+
+// EffectiveSystemBlocks returns SystemBlocks if set, otherwise wraps System
+// in a single block without cache control.
+func (r *ChatRequest) EffectiveSystemBlocks() []SystemBlock {
+	if len(r.SystemBlocks) > 0 {
+		return r.SystemBlocks
+	}
+	if r.System != "" {
+		return []SystemBlock{{Text: r.System}}
+	}
+	return nil
+}
+
+// FullSystemText concatenates all system block texts into a single string.
+func (r *ChatRequest) FullSystemText() string {
+	blocks := r.EffectiveSystemBlocks()
+	if len(blocks) == 0 {
+		return ""
+	}
+	if len(blocks) == 1 {
+		return blocks[0].Text
+	}
+	var b strings.Builder
+	for _, block := range blocks {
+		b.WriteString(block.Text)
+	}
+	return b.String()
 }
 
 // ChatResponse is the output of Provider.Chat.
@@ -92,8 +135,10 @@ type ChatResponse struct {
 
 // Usage tracks token consumption.
 type Usage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens      int `json:"input_tokens"`
+	OutputTokens     int `json:"output_tokens"`
+	CacheReadTokens  int `json:"cache_read_tokens,omitempty"`
+	CacheWriteTokens int `json:"cache_write_tokens,omitempty"`
 }
 
 // StreamEventType identifies the kind of streaming event.
