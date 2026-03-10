@@ -42,3 +42,11 @@ func TestDaemonOption_SkipWhatsApp(t *testing.T) {
 		t.Fatal("expected skipWhatsApp to be true")
 	}
 }
+
+func TestDaemonOption_SkipIMessage(t *testing.T) {
+	cfg := config.Default()
+	d := New(cfg, WithSkipIMessage())
+	if !d.skipIMessage {
+		t.Fatal("expected skipIMessage to be true")
+	}
+}
