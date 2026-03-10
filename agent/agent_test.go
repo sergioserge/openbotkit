@@ -344,6 +344,48 @@ func TestLoop_CompactsHistory(t *testing.T) {
 	}
 }
 
+type mockUsageRecorder struct {
+	records []provider.Usage
+}
+
+func (m *mockUsageRecorder) RecordUsage(model string, usage provider.Usage) {
+	m.records = append(m.records, usage)
+}
+
+func TestLoop_UsageRecorder(t *testing.T) {
+	mp := &mockProvider{
+		responses: []*provider.ChatResponse{
+			{
+				Content:    []provider.ContentBlock{{Type: provider.ContentToolUse, ToolCall: &provider.ToolCall{ID: "c1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+				StopReason: provider.StopToolUse,
+				Usage:      provider.Usage{InputTokens: 100, OutputTokens: 50, CacheReadTokens: 80},
+			},
+			{
+				Content:    []provider.ContentBlock{{Type: provider.ContentText, Text: "Done"}},
+				StopReason: provider.StopEndTurn,
+				Usage:      provider.Usage{InputTokens: 200, OutputTokens: 30},
+			},
+		},
+	}
+	exec := &mockExecutor{results: map[string]string{"bash": "ok"}}
+	recorder := &mockUsageRecorder{}
+	a := New(mp, "test-model", exec, WithUsageRecorder(recorder))
+
+	_, err := a.Run(context.Background(), "test")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(recorder.records) != 2 {
+		t.Fatalf("recorded %d usages, want 2", len(recorder.records))
+	}
+	if recorder.records[0].CacheReadTokens != 80 {
+		t.Errorf("first call CacheReadTokens = %d, want 80", recorder.records[0].CacheReadTokens)
+	}
+	if recorder.records[1].InputTokens != 200 {
+		t.Errorf("second call InputTokens = %d, want 200", recorder.records[1].InputTokens)
+	}
+}
+
 func TestLoop_SystemBlocks(t *testing.T) {
 	mp := &mockProvider{
 		responses: []*provider.ChatResponse{

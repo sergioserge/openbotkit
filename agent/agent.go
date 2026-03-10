@@ -13,17 +13,23 @@ type ToolExecutor interface {
 	ToolSchemas() []provider.Tool
 }
 
+// UsageRecorder records per-call token usage.
+type UsageRecorder interface {
+	RecordUsage(model string, usage provider.Usage)
+}
+
 // Agent orchestrates the conversation between user, LLM, and tools.
 type Agent struct {
-	provider     provider.Provider
-	model        string
-	system       string
-	systemBlocks []provider.SystemBlock
-	executor     ToolExecutor
-	history      []provider.Message
-	maxIter      int
-	maxHistory   int
-	rateLimiter  *provider.RateLimiter
+	provider      provider.Provider
+	model         string
+	system        string
+	systemBlocks  []provider.SystemBlock
+	executor      ToolExecutor
+	history       []provider.Message
+	maxIter       int
+	maxHistory    int
+	rateLimiter   *provider.RateLimiter
+	usageRecorder UsageRecorder
 }
 
 // Option configures an Agent.
@@ -52,6 +58,11 @@ func WithRateLimit(requestsPerHour int) Option {
 // WithSystemBlocks sets structured system prompt blocks with cache control.
 func WithSystemBlocks(blocks []provider.SystemBlock) Option {
 	return func(a *Agent) { a.systemBlocks = blocks }
+}
+
+// WithUsageRecorder sets a recorder for per-call token usage.
+func WithUsageRecorder(r UsageRecorder) Option {
+	return func(a *Agent) { a.usageRecorder = r }
 }
 
 // New creates a new Agent.
@@ -91,6 +102,10 @@ func (a *Agent) Run(ctx context.Context, input string) (string, error) {
 		})
 		if err != nil {
 			return "", fmt.Errorf("chat (iteration %d): %w", i, err)
+		}
+
+		if a.usageRecorder != nil {
+			a.usageRecorder.RecordUsage(a.model, resp.Usage)
 		}
 
 		// Append assistant response to history.
