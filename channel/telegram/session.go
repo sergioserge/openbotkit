@@ -15,6 +15,7 @@ import (
 	"github.com/priyanshujain/openbotkit/memory"
 	"github.com/priyanshujain/openbotkit/provider"
 	historysrc "github.com/priyanshujain/openbotkit/source/history"
+	usagesrc "github.com/priyanshujain/openbotkit/source/usage"
 	"github.com/priyanshujain/openbotkit/store"
 )
 
@@ -22,10 +23,11 @@ const sessionTimeout = 15 * time.Minute
 
 // SessionManager manages Telegram conversations with agent sessions.
 type SessionManager struct {
-	cfg      *config.Config
-	channel  *Channel
-	provider provider.Provider
-	model    string
+	cfg          *config.Config
+	channel      *Channel
+	provider     provider.Provider
+	providerName string
+	model        string
 
 	mu        sync.Mutex
 	sessionID string
@@ -33,12 +35,13 @@ type SessionManager struct {
 	messages  []string // user messages collected in this session
 }
 
-func NewSessionManager(cfg *config.Config, ch *Channel, p provider.Provider, model string) *SessionManager {
+func NewSessionManager(cfg *config.Config, ch *Channel, p provider.Provider, providerName, model string) *SessionManager {
 	return &SessionManager{
-		cfg:      cfg,
-		channel:  ch,
-		provider: p,
-		model:    model,
+		cfg:          cfg,
+		channel:      ch,
+		provider:     p,
+		providerName: providerName,
+		model:        model,
 	}
 }
 
@@ -188,7 +191,12 @@ func (sm *SessionManager) newAgent() (*agent.Agent, error) {
 	identity := "You are a personal AI assistant powered by OpenBotKit, communicating via Telegram.\n"
 	extras := "\nBe concise and direct. Skip filler phrases.\n" + sm.userMemoriesPrompt()
 	blocks := tools.BuildSystemBlocks(identity, toolReg, extras)
-	return agent.New(sm.provider, sm.model, toolReg, agent.WithSystemBlocks(blocks)), nil
+
+	opts := []agent.Option{agent.WithSystemBlocks(blocks)}
+	if recorder := sm.openUsageRecorder(); recorder != nil {
+		opts = append(opts, agent.WithUsageRecorder(recorder))
+	}
+	return agent.New(sm.provider, sm.model, toolReg, opts...), nil
 }
 
 func (sm *SessionManager) userMemoriesPrompt() string {
@@ -238,6 +246,29 @@ func (sm *SessionManager) saveHistory(sessionID, userMsg, assistantMsg string) {
 	if err := historysrc.SaveMessage(histDB, convID, "assistant", assistantMsg); err != nil {
 		slog.Error("telegram session: save assistant message", "error", err)
 	}
+}
+
+func (sm *SessionManager) openUsageRecorder() *usagesrc.Recorder {
+	if err := config.EnsureSourceDir("usage"); err != nil {
+		return nil
+	}
+	db, err := store.Open(store.Config{
+		Driver: sm.cfg.Usage.Storage.Driver,
+		DSN:    sm.cfg.UsageDataDSN(),
+	})
+	if err != nil {
+		return nil
+	}
+	if err := usagesrc.Migrate(db); err != nil {
+		db.Close()
+		return nil
+	}
+
+	sm.mu.Lock()
+	sid := sm.sessionID
+	sm.mu.Unlock()
+
+	return usagesrc.NewRecorder(db, sm.providerName, "telegram", sid)
 }
 
 func generateSessionID() string {

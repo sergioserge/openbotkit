@@ -56,7 +56,7 @@ func TestSession_MessageAndHistorySaved(t *testing.T) {
 	bot := &mockBot{}
 	ch := NewChannel(bot, 123)
 
-	sm := NewSessionManager(cfg, ch, p, model)
+	sm := NewSessionManager(cfg, ch, p, "gemini", model)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -141,7 +141,7 @@ func TestSession_MemoryInjectedIntoPrompt(t *testing.T) {
 
 	bot := &mockBot{}
 	ch := NewChannel(bot, 123)
-	sm := NewSessionManager(cfg, ch, p, model)
+	sm := NewSessionManager(cfg, ch, p, "gemini", model)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -206,7 +206,7 @@ func TestSession_ToolUseViaBash(t *testing.T) {
 
 	bot := &mockBot{}
 	ch := NewChannel(bot, 123)
-	sm := NewSessionManager(cfg, ch, p, model)
+	sm := NewSessionManager(cfg, ch, p, "gemini", model)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()

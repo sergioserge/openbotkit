@@ -129,7 +129,7 @@ func (s *Server) startTelegram(ctx context.Context) error {
 
 	ch := tgchannel.NewChannel(bot, ownerID)
 	poller := tgchannel.NewPoller(bot, ownerID, ch)
-	sm := tgchannel.NewSessionManager(s.cfg, ch, p, modelName)
+	sm := tgchannel.NewSessionManager(s.cfg, ch, p, providerName, modelName)
 
 	go poller.Run(ctx)
 	go sm.Run(ctx)
