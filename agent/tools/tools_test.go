@@ -30,6 +30,38 @@ func TestRegistryProviderTools(t *testing.T) {
 	}
 }
 
+func TestToolSchemasDeterministicOrder(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&stubTool{name: "zeta"})
+	r.Register(&stubTool{name: "alpha"})
+	r.Register(&stubTool{name: "middle"})
+
+	var first []string
+	for _, s := range r.ToolSchemas() {
+		first = append(first, s.Name)
+	}
+
+	for range 10 {
+		var names []string
+		for _, s := range r.ToolSchemas() {
+			names = append(names, s.Name)
+		}
+		if len(names) != len(first) {
+			t.Fatalf("length changed: %d vs %d", len(names), len(first))
+		}
+		for i, name := range names {
+			if name != first[i] {
+				t.Fatalf("order changed at index %d: %q vs %q", i, name, first[i])
+			}
+		}
+	}
+
+	// Verify alphabetical order.
+	if first[0] != "alpha" || first[1] != "middle" || first[2] != "zeta" {
+		t.Errorf("expected alphabetical order, got %v", first)
+	}
+}
+
 func TestBashEcho(t *testing.T) {
 	b := NewBashTool(5 * time.Second)
 	result, err := b.Execute(context.Background(), json.RawMessage(`{"command":"echo hello"}`))
