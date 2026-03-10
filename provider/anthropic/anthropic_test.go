@@ -260,6 +260,180 @@ func TestStreamChat_ToolUse(t *testing.T) {
 	}
 }
 
+func TestChat_SystemBlocks(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		json.NewEncoder(w).Encode(apiResponse{
+			Type:       "message",
+			Content:    []apiContent{{Type: "text", Text: "ok"}},
+			StopReason: "end_turn",
+		})
+	}))
+	defer server.Close()
+
+	p := New("test-key", WithBaseURL(server.URL))
+	_, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model: "claude-sonnet-4-6",
+		SystemBlocks: []provider.SystemBlock{
+			{Text: "You are helpful.", CacheControl: &provider.CacheControl{Type: "ephemeral"}},
+			{Text: "Be concise."},
+		},
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	systemRaw, ok := capturedBody["system"]
+	if !ok {
+		t.Fatal("missing system in request body")
+	}
+	systemBlocks, ok := systemRaw.([]any)
+	if !ok {
+		t.Fatalf("system is not an array: %T", systemRaw)
+	}
+	if len(systemBlocks) != 2 {
+		t.Fatalf("got %d system blocks, want 2", len(systemBlocks))
+	}
+
+	block0 := systemBlocks[0].(map[string]any)
+	if block0["text"] != "You are helpful." {
+		t.Errorf("block 0 text = %q", block0["text"])
+	}
+	if block0["cache_control"] == nil {
+		t.Error("block 0 missing cache_control")
+	}
+
+	block1 := systemBlocks[1].(map[string]any)
+	if block1["text"] != "Be concise." {
+		t.Errorf("block 1 text = %q", block1["text"])
+	}
+	if block1["cache_control"] != nil {
+		t.Error("block 1 should not have cache_control")
+	}
+}
+
+func TestChat_PlainSystemBackcompat(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		json.NewEncoder(w).Encode(apiResponse{
+			Type:       "message",
+			Content:    []apiContent{{Type: "text", Text: "ok"}},
+			StopReason: "end_turn",
+		})
+	}))
+	defer server.Close()
+
+	p := New("test-key", WithBaseURL(server.URL))
+	_, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model:    "claude-sonnet-4-6",
+		System:   "You are helpful.",
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	systemRaw, ok := capturedBody["system"]
+	if !ok {
+		t.Fatal("missing system")
+	}
+	// Plain System string should be sent as an array with one block (no cache_control).
+	blocks, ok := systemRaw.([]any)
+	if !ok {
+		t.Fatalf("system should be array, got %T", systemRaw)
+	}
+	if len(blocks) != 1 {
+		t.Fatalf("got %d blocks, want 1", len(blocks))
+	}
+	block := blocks[0].(map[string]any)
+	if block["text"] != "You are helpful." {
+		t.Errorf("text = %q", block["text"])
+	}
+	if block["cache_control"] != nil {
+		t.Error("plain System should not have cache_control")
+	}
+}
+
+func TestChat_ToolCacheControl(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		json.NewEncoder(w).Encode(apiResponse{
+			Type:       "message",
+			Content:    []apiContent{{Type: "text", Text: "ok"}},
+			StopReason: "end_turn",
+		})
+	}))
+	defer server.Close()
+
+	p := New("test-key", WithBaseURL(server.URL))
+	_, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model:    "claude-sonnet-4-6",
+		System:   "test",
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+		Tools: []provider.Tool{
+			{Name: "tool_a", Description: "first", InputSchema: json.RawMessage(`{"type":"object"}`)},
+			{Name: "tool_b", Description: "second", InputSchema: json.RawMessage(`{"type":"object"}`)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	toolsRaw := capturedBody["tools"].([]any)
+	if len(toolsRaw) != 2 {
+		t.Fatalf("got %d tools", len(toolsRaw))
+	}
+
+	// First tool should NOT have cache_control.
+	tool0 := toolsRaw[0].(map[string]any)
+	if tool0["cache_control"] != nil {
+		t.Error("first tool should not have cache_control")
+	}
+
+	// Last tool should have cache_control.
+	tool1 := toolsRaw[1].(map[string]any)
+	if tool1["cache_control"] == nil {
+		t.Error("last tool should have cache_control")
+	}
+}
+
+func TestChat_CacheUsage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(apiResponse{
+			Type:       "message",
+			Content:    []apiContent{{Type: "text", Text: "ok"}},
+			StopReason: "end_turn",
+			Usage: apiUsage{
+				InputTokens:              100,
+				OutputTokens:             50,
+				CacheCreationInputTokens: 80,
+				CacheReadInputTokens:     20,
+			},
+		})
+	}))
+	defer server.Close()
+
+	p := New("test-key", WithBaseURL(server.URL))
+	resp, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model:    "claude-sonnet-4-6",
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	if resp.Usage.CacheWriteTokens != 80 {
+		t.Errorf("CacheWriteTokens = %d, want 80", resp.Usage.CacheWriteTokens)
+	}
+	if resp.Usage.CacheReadTokens != 20 {
+		t.Errorf("CacheReadTokens = %d, want 20", resp.Usage.CacheReadTokens)
+	}
+}
+
 func TestAnthropicIntegration(t *testing.T) {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
