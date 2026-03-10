@@ -185,6 +185,21 @@ func (sm *SessionManager) newAgent() (*agent.Agent, error) {
 	toolReg.Register(&tools.FileEditTool{})
 	toolReg.Register(&tools.LoadSkillsTool{})
 	toolReg.Register(&tools.SearchSkillsTool{})
+	toolReg.Register(tools.NewSubagentTool(tools.SubagentConfig{
+		Provider: sm.provider,
+		Model:    sm.model,
+		ToolFactory: func() *tools.Registry {
+			r := tools.NewRegistry()
+			r.Register(tools.NewBashTool(30 * time.Second))
+			r.Register(&tools.FileReadTool{})
+			r.Register(&tools.FileWriteTool{})
+			r.Register(&tools.FileEditTool{})
+			r.Register(&tools.LoadSkillsTool{})
+			r.Register(&tools.SearchSkillsTool{})
+			return r
+		},
+		System: "You are a focused sub-agent. Complete the given task and return a concise result.",
+	}))
 
 	system := sm.buildSystemPrompt()
 	return agent.New(sm.provider, sm.model, toolReg, agent.WithSystem(system)), nil
@@ -194,7 +209,7 @@ func (sm *SessionManager) buildSystemPrompt() string {
 	system := `You are a personal AI assistant powered by OpenBotKit, communicating via Telegram.
 
 ## Tools
-Available: bash, file_read, file_write, file_edit, load_skills, search_skills.
+Available: bash, file_read, file_write, file_edit, load_skills, search_skills, subagent.
 Tool names are case-sensitive. Call tools exactly as listed.
 
 Rules:
