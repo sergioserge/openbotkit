@@ -109,6 +109,7 @@ func (a *Agent) Run(ctx context.Context, input string) (string, error) {
 				Type: provider.ContentToolResult,
 				ToolResult: &provider.ToolResult{
 					ToolUseID: call.ID,
+					Name:      call.Name,
 					Content:   content,
 					IsError:   isError,
 				},
