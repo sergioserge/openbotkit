@@ -15,7 +15,9 @@ import (
 	"github.com/priyanshujain/openbotkit/internal/testutil"
 	"github.com/priyanshujain/openbotkit/memory"
 	"github.com/priyanshujain/openbotkit/provider"
+	"github.com/priyanshujain/openbotkit/provider/anthropic"
 	"github.com/priyanshujain/openbotkit/provider/gemini"
+	"github.com/priyanshujain/openbotkit/provider/openai"
 	embeddedSkills "github.com/priyanshujain/openbotkit/skills"
 	gmail "github.com/priyanshujain/openbotkit/source/gmail"
 	"github.com/priyanshujain/openbotkit/source/whatsapp"
@@ -28,14 +30,44 @@ type LocalFixture struct {
 	Model    string
 }
 
+type providerCase struct {
+	Name     string
+	Provider provider.Provider
+	Model    string
+}
+
+// NewLocalFixture creates a fixture using the first available provider.
 func NewLocalFixture(t *testing.T) *LocalFixture {
+	t.Helper()
+	cases := availableProviders(t)
+	if len(cases) == 0 {
+		t.Skip("no LLM API keys set — skipping spec tests")
+	}
+	return newLocalFixtureWith(t, cases[0].Provider, cases[0].Model)
+}
+
+// EachProvider runs fn as a subtest for every available LLM provider.
+func EachProvider(t *testing.T, fn func(t *testing.T, fx *LocalFixture)) {
+	t.Helper()
+	cases := availableProviders(t)
+	if len(cases) == 0 {
+		t.Skip("no LLM API keys set — skipping spec tests")
+	}
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			fx := newLocalFixtureWith(t, tc.Provider, tc.Model)
+			fn(t, fx)
+		})
+	}
+}
+
+func newLocalFixtureWith(t *testing.T, p provider.Provider, model string) *LocalFixture {
 	t.Helper()
 
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 not in PATH")
 	}
 
-	p, model := requireProvider(t)
 	dir := t.TempDir()
 	t.Setenv("OBK_CONFIG_DIR", dir)
 
@@ -56,15 +88,43 @@ func NewLocalFixture(t *testing.T) *LocalFixture {
 	}
 }
 
-func requireProvider(t *testing.T) (provider.Provider, string) {
+func availableProviders(t *testing.T) []providerCase {
 	t.Helper()
 	testutil.LoadEnv(t)
+	var cases []providerCase
 
 	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
-		return gemini.New(key), "gemini-2.5-flash"
+		cases = append(cases, providerCase{
+			Name:     "gemini",
+			Provider: gemini.New(key),
+			Model:    "gemini-2.5-flash",
+		})
 	}
-	t.Skip("no LLM API keys set (GEMINI_API_KEY) — skipping spec tests")
-	return nil, ""
+	if project := os.Getenv("GOOGLE_CLOUD_PROJECT"); project != "" {
+		region := os.Getenv("GOOGLE_CLOUD_REGION")
+		if region == "" {
+			region = "us-east5"
+		}
+		account := os.Getenv("GOOGLE_CLOUD_ACCOUNT")
+		model := os.Getenv("VERTEX_CLAUDE_MODEL")
+		if model == "" {
+			model = "claude-sonnet-4@20250514"
+		}
+		cases = append(cases, providerCase{
+			Name:     "anthropic-vertex",
+			Provider: anthropic.New("", anthropic.WithVertexAI(project, region), anthropic.WithTokenSource(provider.GcloudTokenSource(account))),
+			Model:    model,
+		})
+	}
+	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
+		cases = append(cases, providerCase{
+			Name:     "openai",
+			Provider: openai.New(key),
+			Model:    "gpt-4o-mini",
+		})
+	}
+
+	return cases
 }
 
 func createSourceDirs(t *testing.T, dir string) {
