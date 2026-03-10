@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/priyanshujain/openbotkit/provider"
 )
@@ -29,6 +30,19 @@ func NewRegistry() *Registry {
 // Register adds a tool to the registry.
 func (r *Registry) Register(t Tool) {
 	r.tools[t.Name()] = t
+}
+
+// NewStandardRegistry creates a registry with the standard tool set
+// (bash, file_read, file_write, file_edit, load_skills, search_skills).
+func NewStandardRegistry() *Registry {
+	r := NewRegistry()
+	r.Register(NewBashTool(30 * time.Second))
+	r.Register(&FileReadTool{})
+	r.Register(&FileWriteTool{})
+	r.Register(&FileEditTool{})
+	r.Register(&LoadSkillsTool{})
+	r.Register(&SearchSkillsTool{})
+	return r
 }
 
 const maxOutputBytes = 524288 // 512KB

@@ -178,27 +178,12 @@ func (sm *SessionManager) buildLLM() (memory.LLM, error) {
 }
 
 func (sm *SessionManager) newAgent() (*agent.Agent, error) {
-	toolReg := tools.NewRegistry()
-	toolReg.Register(tools.NewBashTool(30 * time.Second))
-	toolReg.Register(&tools.FileReadTool{})
-	toolReg.Register(&tools.FileWriteTool{})
-	toolReg.Register(&tools.FileEditTool{})
-	toolReg.Register(&tools.LoadSkillsTool{})
-	toolReg.Register(&tools.SearchSkillsTool{})
+	toolReg := tools.NewStandardRegistry()
 	toolReg.Register(tools.NewSubagentTool(tools.SubagentConfig{
-		Provider: sm.provider,
-		Model:    sm.model,
-		ToolFactory: func() *tools.Registry {
-			r := tools.NewRegistry()
-			r.Register(tools.NewBashTool(30 * time.Second))
-			r.Register(&tools.FileReadTool{})
-			r.Register(&tools.FileWriteTool{})
-			r.Register(&tools.FileEditTool{})
-			r.Register(&tools.LoadSkillsTool{})
-			r.Register(&tools.SearchSkillsTool{})
-			return r
-		},
-		System: "You are a focused sub-agent. Complete the given task and return a concise result.",
+		Provider:    sm.provider,
+		Model:       sm.model,
+		ToolFactory: tools.NewStandardRegistry,
+		System:      "You are a focused sub-agent. Complete the given task and return a concise result.",
 	}))
 
 	system := sm.buildSystemPrompt()
