@@ -8,8 +8,9 @@ import (
 
 // TestSpec_SummarizeCommunicationsAcrossSources seeds emails and WhatsApp
 // messages from the same person, then asks the agent to summarize all
-// communications. The agent must discover and use both email-read and
-// whatsapp-read skills, query both databases, and synthesize the results.
+// communications. The agent must autonomously discover and use both email-read
+// and whatsapp-read skills, query both databases, and synthesize the results
+// in a single turn.
 func TestSpec_SummarizeCommunicationsAcrossSources(t *testing.T) {
 	fx := NewLocalFixture(t)
 
@@ -27,17 +28,10 @@ func TestSpec_SummarizeCommunicationsAcrossSources(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
-	// First turn: query WhatsApp
-	_, err := a.Run(ctx, "Load the whatsapp-read skill and search WhatsApp messages from Alice. Report what you find.")
-	if err != nil {
-		t.Fatalf("agent.Run (WhatsApp): %v", err)
-	}
-
-	// Second turn: query email and combine with prior WhatsApp findings
-	prompt := "Now load the email-read skill and search emails from Alice. Then give me a combined summary of everything you found about Alice across both WhatsApp and email."
+	prompt := "Summarize all communications from Alice across both email and WhatsApp."
 	result, err := a.Run(ctx, prompt)
 	if err != nil {
-		t.Fatalf("agent.Run (email): %v", err)
+		t.Fatalf("agent.Run: %v", err)
 	}
 
 	AssertNotEmpty(t, result)
@@ -49,9 +43,9 @@ func TestSpec_SummarizeCommunicationsAcrossSources(t *testing.T) {
 }
 
 // TestSpec_RecallMemoryAndCorrelateEmails seeds personal memories about a
-// relationship and emails with project details. The agent must check memories
-// for context about the person, then search emails for specifics, and combine
-// both into a coherent answer.
+// relationship and emails with project details. The agent must autonomously
+// check memories for context about the person, search emails for specifics,
+// and combine both into a coherent answer in a single turn.
 func TestSpec_RecallMemoryAndCorrelateEmails(t *testing.T) {
 	fx := NewLocalFixture(t)
 
@@ -69,17 +63,10 @@ func TestSpec_RecallMemoryAndCorrelateEmails(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
-	// First turn: query memories
-	_, err := a.Run(ctx, "Run 'obk memory list' and tell me what memories are stored.")
-	if err != nil {
-		t.Fatalf("agent.Run (memory): %v", err)
-	}
-
-	// Second turn: query emails and combine
-	prompt := "Now load the email-read skill and search emails from Raj. Give me a combined summary of everything about Raj and Project Firebird from both memories and emails."
+	prompt := "Tell me everything about Raj and Project Firebird. Check both my memories and emails."
 	result, err := a.Run(ctx, prompt)
 	if err != nil {
-		t.Fatalf("agent.Run (email): %v", err)
+		t.Fatalf("agent.Run: %v", err)
 	}
 
 	AssertNotEmpty(t, result)

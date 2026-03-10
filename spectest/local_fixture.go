@@ -210,19 +210,11 @@ func buildSystemPrompt() string {
 
 You have core tools available: bash (run commands), file_read, load_skills, search_skills.
 
-IMPORTANT WORKFLOW: When the user asks about email, WhatsApp, memories, or any domain-specific data:
-1. Look at the "Available skills" list below to find relevant skill names
-2. Use load_skills with the exact skill name (e.g. load_skills("email-read")) to get detailed instructions
+When the user asks about email, WhatsApp, memories, or other domain-specific data:
+1. Check the "Available skills" list below for relevant skill names
+2. Use load_skills to get detailed instructions for each skill
 3. Use bash to run the commands from the skill instructions
-4. If the question spans multiple domains (e.g. email + memories), load and use ALL relevant skills
-5. You can also use search_skills to discover skills by keyword
-
-CRITICAL RULES:
-- Complete ALL data lookups before responding to the user. Do not respond with partial results.
-- Never fabricate or imagine data. Only report information returned by actual tool calls.
-- Never generate fake tool call responses in your text output.
-- Always use the bash tool to run queries — do not simulate or predict query results.
-- If a query returns no results, say so explicitly.
+4. If the question spans multiple domains, load and use ALL relevant skills
 `
 
 	idx, err := skills.LoadIndex()
