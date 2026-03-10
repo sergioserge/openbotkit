@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -32,6 +35,12 @@ type Gemini struct {
 	vertexRegion  string
 	tokenOnce     sync.Once
 	tokenSource   oauth2.TokenSource
+
+	// CachedContent lifecycle.
+	cacheMu           sync.Mutex
+	cachedContentName string
+	cachedContentHash string
+	cacheExpiry       time.Time
 }
 
 var _ provider.Provider = (*Gemini)(nil)
@@ -111,6 +120,7 @@ func init() {
 // Chat sends a non-streaming request.
 func (g *Gemini) Chat(ctx context.Context, req provider.ChatRequest) (*provider.ChatResponse, error) {
 	body := g.buildRequest(req)
+	g.applyCacheToBody(ctx, req, body)
 
 	url, err := g.chatURL(ctx, req.Model, false)
 	if err != nil {
@@ -137,6 +147,7 @@ func (g *Gemini) Chat(ctx context.Context, req provider.ChatRequest) (*provider.
 // StreamChat sends a streaming request.
 func (g *Gemini) StreamChat(ctx context.Context, req provider.ChatRequest) (<-chan provider.StreamEvent, error) {
 	body := g.buildRequest(req)
+	g.applyCacheToBody(ctx, req, body)
 
 	url, err := g.chatURL(ctx, req.Model, true)
 	if err != nil {
@@ -174,9 +185,9 @@ func (g *Gemini) chatURL(ctx context.Context, model string, stream bool) (string
 func (g *Gemini) buildRequest(req provider.ChatRequest) map[string]any {
 	body := map[string]any{}
 
-	if req.System != "" {
+	if sysText := req.FullSystemText(); sysText != "" {
 		body["systemInstruction"] = map[string]any{
-			"parts": []map[string]any{{"text": req.System}},
+			"parts": []map[string]any{{"text": sysText}},
 		}
 	}
 
@@ -210,6 +221,186 @@ func (g *Gemini) buildRequest(req provider.ChatRequest) map[string]any {
 	}
 
 	return body
+}
+
+// applyCacheToBody attempts to use a cached content resource. If successful,
+// it removes systemInstruction and tools from the body and sets cachedContent.
+func (g *Gemini) applyCacheToBody(ctx context.Context, req provider.ChatRequest, body map[string]any) {
+	cacheName := g.ensureCache(ctx, req)
+	if cacheName == "" {
+		return
+	}
+	delete(body, "systemInstruction")
+	delete(body, "tools")
+	body["cachedContent"] = cacheName
+}
+
+// ensureCache creates or reuses a CachedContent resource for the system+tools prefix.
+// Returns the resource name on success, or empty string if caching is unavailable.
+func (g *Gemini) ensureCache(ctx context.Context, req provider.ChatRequest) string {
+	sysText := req.FullSystemText()
+	if sysText == "" && len(req.Tools) == 0 {
+		return ""
+	}
+
+	hash := g.computeCacheHash(req)
+
+	g.cacheMu.Lock()
+	defer g.cacheMu.Unlock()
+
+	if g.cachedContentName != "" && g.cachedContentHash == hash && time.Now().Before(g.cacheExpiry) {
+		return g.cachedContentName
+	}
+
+	// Delete stale cache if any.
+	if g.cachedContentName != "" {
+		go g.deleteCache(context.Background(), g.cachedContentName)
+		g.cachedContentName = ""
+		g.cachedContentHash = ""
+	}
+
+	name, expiry, err := g.createCache(ctx, req)
+	if err != nil {
+		slog.Debug("gemini: cache creation failed, proceeding without cache", "error", err)
+		return ""
+	}
+
+	g.cachedContentName = name
+	g.cachedContentHash = hash
+	g.cacheExpiry = expiry
+	return name
+}
+
+func (g *Gemini) computeCacheHash(req provider.ChatRequest) string {
+	h := sha256.New()
+	h.Write([]byte(req.FullSystemText()))
+	for _, t := range req.Tools {
+		h.Write([]byte(t.Name))
+		h.Write(t.InputSchema)
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func (g *Gemini) createCache(ctx context.Context, req provider.ChatRequest) (string, time.Time, error) {
+	cacheBody := map[string]any{
+		"model":            g.cacheModelName(req.Model),
+		"displayName":     "obk-prompt-cache",
+		"expireTime":      time.Now().Add(30 * time.Minute).UTC().Format(time.RFC3339),
+	}
+
+	if sysText := req.FullSystemText(); sysText != "" {
+		cacheBody["systemInstruction"] = map[string]any{
+			"parts": []map[string]any{{"text": sysText}},
+		}
+	}
+
+	if len(req.Tools) > 0 {
+		var decls []map[string]any
+		for _, t := range req.Tools {
+			decl := map[string]any{
+				"name":        t.Name,
+				"description": t.Description,
+			}
+			var schema map[string]any
+			if err := json.Unmarshal(t.InputSchema, &schema); err == nil {
+				decl["parameters"] = schema
+			}
+			decls = append(decls, decl)
+		}
+		cacheBody["tools"] = []map[string]any{{"functionDeclarations": decls}}
+	}
+
+	url, err := g.cacheURL(ctx)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	jsonBody, err := json.Marshal(cacheBody)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("marshal cache body: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("create cache request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	if g.isVertexAI() {
+		token, err := g.vertexToken(ctx)
+		if err != nil {
+			return "", time.Time{}, err
+		}
+		httpReq.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := g.client.Do(httpReq)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("send cache request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", time.Time{}, fmt.Errorf("cache creation failed (HTTP %d): %s", resp.StatusCode, string(body))
+	}
+
+	var cacheResp struct {
+		Name       string `json:"name"`
+		ExpireTime string `json:"expireTime"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&cacheResp); err != nil {
+		return "", time.Time{}, fmt.Errorf("decode cache response: %w", err)
+	}
+
+	expiry, _ := time.Parse(time.RFC3339, cacheResp.ExpireTime)
+	return cacheResp.Name, expiry, nil
+}
+
+func (g *Gemini) deleteCache(ctx context.Context, name string) {
+	url, err := g.deleteCacheURL(ctx, name)
+	if err != nil {
+		return
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	if err != nil {
+		return
+	}
+	if g.isVertexAI() {
+		token, err := g.vertexToken(ctx)
+		if err != nil {
+			return
+		}
+		httpReq.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := g.client.Do(httpReq)
+	if err == nil {
+		resp.Body.Close()
+	}
+}
+
+func (g *Gemini) cacheModelName(model string) string {
+	if g.isVertexAI() {
+		return fmt.Sprintf("projects/%s/locations/%s/publishers/google/models/%s",
+			g.vertexProject, g.vertexRegion, model)
+	}
+	return "models/" + model
+}
+
+func (g *Gemini) cacheURL(ctx context.Context) (string, error) {
+	if g.isVertexAI() {
+		return fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/cachedContents",
+			g.vertexRegion, g.vertexProject, g.vertexRegion), nil
+	}
+	return fmt.Sprintf("%s/v1beta/cachedContents?key=%s", g.baseURL, g.apiKey), nil
+}
+
+func (g *Gemini) deleteCacheURL(ctx context.Context, name string) (string, error) {
+	if g.isVertexAI() {
+		return fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/%s",
+			g.vertexRegion, name), nil
+	}
+	return fmt.Sprintf("%s/v1beta/%s?key=%s", g.baseURL, name, g.apiKey), nil
 }
 
 // convertMessage translates a provider.Message into Gemini content(s).
@@ -324,8 +515,9 @@ func (g *Gemini) doRequest(ctx context.Context, url string, body map[string]any)
 func (g *Gemini) parseResponse(resp *apiResponse) *provider.ChatResponse {
 	result := &provider.ChatResponse{
 		Usage: provider.Usage{
-			InputTokens:  resp.UsageMetadata.PromptTokenCount,
-			OutputTokens: resp.UsageMetadata.CandidatesTokenCount,
+			InputTokens:     resp.UsageMetadata.PromptTokenCount,
+			OutputTokens:    resp.UsageMetadata.CandidatesTokenCount,
+			CacheReadTokens: resp.UsageMetadata.CachedContentTokenCount,
 		},
 	}
 
@@ -466,8 +658,9 @@ type apiFuncCall struct {
 }
 
 type apiUsage struct {
-	PromptTokenCount     int `json:"promptTokenCount"`
-	CandidatesTokenCount int `json:"candidatesTokenCount"`
+	PromptTokenCount        int `json:"promptTokenCount"`
+	CandidatesTokenCount    int `json:"candidatesTokenCount"`
+	CachedContentTokenCount int `json:"cachedContentTokenCount"`
 }
 
 type apiError struct {
