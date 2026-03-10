@@ -186,7 +186,8 @@ func (sm *SessionManager) newAgent() (*agent.Agent, error) {
 	}))
 
 	system := "You are a personal AI assistant powered by OpenBotKit, communicating via Telegram.\n" +
-		tools.BuildBaseSystemPrompt(toolReg)
+		tools.BuildBaseSystemPrompt(toolReg) +
+		"\nBe concise and direct. Skip filler phrases.\n"
 	system += sm.userMemoriesPrompt()
 	return agent.New(sm.provider, sm.model, toolReg, agent.WithSystem(system)), nil
 }

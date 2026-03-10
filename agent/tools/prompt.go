@@ -30,7 +30,6 @@ Rules:
 - Never predict or claim results before receiving them. Wait for tool output.
 - Do not narrate routine tool calls — just call the tool. Only explain when the step is non-obvious or the user asked for details.
 - If a tool call fails, analyze the error before retrying with a different approach.
-- Be concise and direct. Skip filler phrases.
 `)
 
 	// Sub-agents section — only if the subagent tool is registered.
