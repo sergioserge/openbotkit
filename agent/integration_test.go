@@ -170,6 +170,7 @@ func TestIntegration_ToolUseRoundtrip(t *testing.T) {
 							Type: provider.ContentToolResult,
 							ToolResult: &provider.ToolResult{
 								ToolUseID: calls[0].ID,
+								Name:      calls[0].Name,
 								Content:   `{"temperature": "22°C", "condition": "Sunny"}`,
 							},
 						},
