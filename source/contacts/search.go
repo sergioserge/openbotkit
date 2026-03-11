@@ -17,8 +17,9 @@ func SearchContacts(db *store.DB, query string, limit int) ([]SearchResult, erro
 	}
 
 	queryLower := strings.ToLower(query)
-	prefixPattern := queryLower + "%"
-	substringPattern := "%" + queryLower + "%"
+	escaped := escapeLike(queryLower)
+	prefixPattern := escaped + "%"
+	substringPattern := "%" + escaped + "%"
 
 	rows, err := db.Query(
 		db.Rebind(`SELECT c.id, c.display_name, c.created_at, c.updated_at,
@@ -82,4 +83,10 @@ func SearchContacts(db *store.DB, query string, limit int) ([]SearchResult, erro
 		})
 	}
 	return results, nil
+}
+
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, "%", "\\%")
+	s = strings.ReplaceAll(s, "_", "\\_")
+	return s
 }

@@ -97,7 +97,7 @@ func lookupIMDisplayName(imDB *store.DB, handleID string) string {
 		imDB.Rebind(`SELECT c.display_name FROM imessage_chats c
 			WHERE c.is_group = 0 AND c.participants_json LIKE ?
 			LIMIT 1`),
-		"%"+handleID+"%",
+		"%"+escapeLike(handleID)+"%",
 	).Scan(&name)
 	if name.Valid && name.String != "" {
 		return name.String
