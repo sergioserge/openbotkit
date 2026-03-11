@@ -2,6 +2,8 @@ package tools
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -125,7 +127,11 @@ func (g *GWSExecuteTool) run(ctx context.Context, args []string) (string, error)
 }
 
 func (g *GWSExecuteTool) requestConsent(ctx context.Context, scopes []string) error {
-	state := fmt.Sprintf("gws-%d", time.Now().UnixNano())
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Errorf("generate state: %w", err)
+	}
+	state := "gws-" + hex.EncodeToString(b[:])
 	url, err := g.google.AuthURL(g.account, scopes, state)
 	if err != nil {
 		return fmt.Errorf("generate auth URL: %w", err)
