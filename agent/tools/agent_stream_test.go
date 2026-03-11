@@ -54,7 +54,7 @@ func TestParseStreamLine_EmptyType(t *testing.T) {
 }
 
 func TestStreamRunner_BuildsClaudeStreamArgs(t *testing.T) {
-	r := NewStreamRunner(AgentInfo{Kind: AgentClaude, Binary: "/usr/local/bin/claude"})
+	r := NewStreamRunner(AgentInfo{Kind: AgentClaude, Binary: "claude"})
 	args := r.buildStreamArgs(runOptions{})
 	want := []string{"--print", "--verbose", "--output-format", "stream-json"}
 	if len(args) != len(want) {
@@ -68,7 +68,7 @@ func TestStreamRunner_BuildsClaudeStreamArgs(t *testing.T) {
 }
 
 func TestStreamRunner_BuildsGeminiStreamArgs(t *testing.T) {
-	r := NewStreamRunner(AgentInfo{Kind: AgentGemini, Binary: "/usr/local/bin/gemini"})
+	r := NewStreamRunner(AgentInfo{Kind: AgentGemini, Binary: "gemini"})
 	args := r.buildStreamArgs(runOptions{})
 	want := []string{"-o", "stream-json"}
 	if len(args) != len(want) {
@@ -82,7 +82,7 @@ func TestStreamRunner_BuildsGeminiStreamArgs(t *testing.T) {
 }
 
 func TestStreamRunner_BuildsCodexStreamArgs(t *testing.T) {
-	r := NewStreamRunner(AgentInfo{Kind: AgentCodex, Binary: "/usr/local/bin/codex"})
+	r := NewStreamRunner(AgentInfo{Kind: AgentCodex, Binary: "codex"})
 	args := r.buildStreamArgs(runOptions{})
 	want := []string{"exec", "--json"}
 	if len(args) != len(want) {
@@ -96,7 +96,7 @@ func TestStreamRunner_BuildsCodexStreamArgs(t *testing.T) {
 }
 
 func TestStreamRunner_BuildsClaudeStreamArgsWithBudget(t *testing.T) {
-	r := NewStreamRunner(AgentInfo{Kind: AgentClaude, Binary: "/usr/local/bin/claude"})
+	r := NewStreamRunner(AgentInfo{Kind: AgentClaude, Binary: "claude"})
 	args := r.buildStreamArgs(runOptions{maxBudgetUSD: 0.50})
 	found := false
 	for i, a := range args {

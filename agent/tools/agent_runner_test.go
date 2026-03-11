@@ -82,7 +82,7 @@ func TestDetectAgents_Priority(t *testing.T) {
 }
 
 func TestAgentRunner_BuildsClaudeArgs(t *testing.T) {
-	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "/usr/local/bin/claude"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "claude"})
 	args := r.buildArgs(runOptions{})
 	want := []string{"--print", "--output-format", "text"}
 	if len(args) != len(want) {
@@ -96,7 +96,7 @@ func TestAgentRunner_BuildsClaudeArgs(t *testing.T) {
 }
 
 func TestAgentRunner_BuildsGeminiArgs(t *testing.T) {
-	r := NewAgentRunner(AgentInfo{Kind: AgentGemini, Binary: "/usr/local/bin/gemini"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentGemini, Binary: "gemini"})
 	args := r.buildArgs(runOptions{})
 	want := []string{"-p"}
 	if len(args) != len(want) {
@@ -108,7 +108,7 @@ func TestAgentRunner_BuildsGeminiArgs(t *testing.T) {
 }
 
 func TestAgentRunner_BuildsCodexArgs(t *testing.T) {
-	r := NewAgentRunner(AgentInfo{Kind: AgentCodex, Binary: "/usr/local/bin/codex"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentCodex, Binary: "codex"})
 	args := r.buildArgs(runOptions{})
 	want := []string{"exec"}
 	if len(args) != len(want) {
@@ -121,7 +121,7 @@ func TestAgentRunner_BuildsCodexArgs(t *testing.T) {
 
 func TestAgentRunner_StripsCLAUDECODE(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
-	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "/usr/local/bin/claude"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "claude"})
 	env := r.buildEnv()
 	for _, e := range env {
 		if e == "CLAUDECODE=1" {
@@ -132,7 +132,7 @@ func TestAgentRunner_StripsCLAUDECODE(t *testing.T) {
 
 func TestAgentRunner_GeminiKeepsCLAUDECODE(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
-	r := NewAgentRunner(AgentInfo{Kind: AgentGemini, Binary: "/usr/local/bin/gemini"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentGemini, Binary: "gemini"})
 	env := r.buildEnv()
 	found := false
 	for _, e := range env {
