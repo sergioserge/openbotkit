@@ -171,25 +171,31 @@ func importApplePerson(db *store.DB, p applePerson, result *SyncResult) error {
 		if normalized == "" {
 			continue
 		}
-		_ = UpsertIdentity(db, &Identity{
+		if err := UpsertIdentity(db, &Identity{
 			ContactID: contactID, Source: "applecontacts", IdentityType: "phone",
 			IdentityValue: normalized, RawValue: ph,
-		})
+		}); err != nil {
+			slog.Warn("contacts: apple upsert phone identity", "phone", normalized, "error", err)
+		}
 	}
 	for _, em := range p.emails {
 		normalized := NormalizeEmail(em)
 		if normalized == "" {
 			continue
 		}
-		_ = UpsertIdentity(db, &Identity{
+		if err := UpsertIdentity(db, &Identity{
 			ContactID: contactID, Source: "applecontacts", IdentityType: "email",
 			IdentityValue: normalized, RawValue: em,
-		})
+		}); err != nil {
+			slog.Warn("contacts: apple upsert email identity", "email", normalized, "error", err)
+		}
 	}
 
 	fullName := strings.TrimSpace(p.firstName + " " + p.lastName)
 	for _, name := range []string{fullName, p.firstName, p.lastName, p.nickname} {
-		_ = AddAlias(db, contactID, name, "applecontacts")
+		if err := AddAlias(db, contactID, name, "applecontacts"); err != nil {
+			slog.Warn("contacts: apple add alias", "alias", name, "error", err)
+		}
 	}
 
 	return nil
