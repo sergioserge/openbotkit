@@ -92,10 +92,22 @@ func buildEngines(client *http.Client, backend string) []Engine {
 	case "", "auto":
 		return []Engine{
 			NewDuckDuckGo(client),
+			NewBrave(client),
+			NewMojeek(client),
 			NewWikipedia(client),
 		}
 	case "duckduckgo":
 		return []Engine{NewDuckDuckGo(client)}
+	case "brave":
+		return []Engine{NewBrave(client)}
+	case "mojeek":
+		return []Engine{NewMojeek(client)}
+	case "yahoo":
+		return []Engine{NewYahoo(client)}
+	case "yandex":
+		return []Engine{NewYandex(client)}
+	case "google":
+		return []Engine{NewGoogle(client)}
 	case "wikipedia":
 		return []Engine{NewWikipedia(client)}
 	default:

@@ -134,17 +134,52 @@ func TestSearchBackendSelection(t *testing.T) {
 		}
 	})
 
-	t.Run("auto uses both", func(t *testing.T) {
-		engines := buildEngines(nil, "auto")
-		if len(engines) != 2 {
-			t.Errorf("expected 2 engines for auto, got %d", len(engines))
+	t.Run("brave only", func(t *testing.T) {
+		engines := buildEngines(nil, "brave")
+		if len(engines) != 1 || engines[0].Name() != "brave" {
+			t.Errorf("expected only brave engine")
 		}
 	})
 
-	t.Run("empty uses both", func(t *testing.T) {
+	t.Run("mojeek only", func(t *testing.T) {
+		engines := buildEngines(nil, "mojeek")
+		if len(engines) != 1 || engines[0].Name() != "mojeek" {
+			t.Errorf("expected only mojeek engine")
+		}
+	})
+
+	t.Run("yahoo only", func(t *testing.T) {
+		engines := buildEngines(nil, "yahoo")
+		if len(engines) != 1 || engines[0].Name() != "yahoo" {
+			t.Errorf("expected only yahoo engine")
+		}
+	})
+
+	t.Run("yandex only", func(t *testing.T) {
+		engines := buildEngines(nil, "yandex")
+		if len(engines) != 1 || engines[0].Name() != "yandex" {
+			t.Errorf("expected only yandex engine")
+		}
+	})
+
+	t.Run("google only", func(t *testing.T) {
+		engines := buildEngines(nil, "google")
+		if len(engines) != 1 || engines[0].Name() != "google" {
+			t.Errorf("expected only google engine")
+		}
+	})
+
+	t.Run("auto uses duckduckgo+brave+mojeek+wikipedia", func(t *testing.T) {
+		engines := buildEngines(nil, "auto")
+		if len(engines) != 4 {
+			t.Errorf("expected 4 engines for auto, got %d", len(engines))
+		}
+	})
+
+	t.Run("empty uses auto set", func(t *testing.T) {
 		engines := buildEngines(nil, "")
-		if len(engines) != 2 {
-			t.Errorf("expected 2 engines for empty, got %d", len(engines))
+		if len(engines) != 4 {
+			t.Errorf("expected 4 engines for empty, got %d", len(engines))
 		}
 	})
 
