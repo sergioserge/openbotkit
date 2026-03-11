@@ -106,12 +106,18 @@ func (w *WebSearch) Fetch(ctx context.Context, rawURL string, opts FetchOptions)
 }
 
 func normalizeGitHubURL(raw string) string {
-	if !strings.Contains(raw, "github.com") {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host != "github.com" {
 		return raw
 	}
-	raw = strings.Replace(raw, "github.com/", "raw.githubusercontent.com/", 1)
-	raw = strings.Replace(raw, "/blob/", "/", 1)
-	return raw
+	parts := strings.SplitN(u.Path, "/", 5) // /user/repo/blob/branch/path
+	if len(parts) < 5 || parts[3] != "blob" {
+		return raw
+	}
+	// Rewrite: /user/repo/blob/branch/path → /user/repo/branch/path
+	u.Host = "raw.githubusercontent.com"
+	u.Path = strings.Join(append(parts[:3], parts[4:]...), "/")
+	return u.String()
 }
 
 func extractTitle(html []byte) string {

@@ -106,24 +106,29 @@ func TestFetchTruncation(t *testing.T) {
 	}
 }
 
-func TestFetchGitHubBlobURL(t *testing.T) {
-	var receivedHost string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedHost = r.Host
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprint(w, "file content")
-	}))
-	defer srv.Close()
-
-	// Test the normalizeGitHubURL function directly.
-	input := "https://github.com/user/repo/blob/main/file.go"
-	expected := "https://raw.githubusercontent.com/user/repo/main/file.go"
-	got := normalizeGitHubURL(input)
-	if got != expected {
-		t.Errorf("normalizeGitHubURL:\n  got:  %q\n  want: %q", got, expected)
+func TestNormalizeGitHubURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"blob URL", "https://github.com/user/repo/blob/main/file.go",
+			"https://raw.githubusercontent.com/user/repo/main/file.go"},
+		{"non-blob GitHub URL", "https://github.com/user/repo/issues/1",
+			"https://github.com/user/repo/issues/1"},
+		{"non-GitHub URL", "https://example.com/github.com/blob/foo",
+			"https://example.com/github.com/blob/foo"},
+		{"raw URL passthrough", "https://raw.githubusercontent.com/user/repo/main/f.go",
+			"https://raw.githubusercontent.com/user/repo/main/f.go"},
 	}
-
-	_ = receivedHost
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeGitHubURL(tt.input)
+			if got != tt.want {
+				t.Errorf("normalizeGitHubURL(%q):\n  got:  %q\n  want: %q", tt.input, got, tt.want)
+			}
+		})
+	}
 }
 
 func TestFetchSSRFBlocksLoopback(t *testing.T) {
