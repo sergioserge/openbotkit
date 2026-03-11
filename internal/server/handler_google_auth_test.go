@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -34,18 +35,85 @@ func TestHandleGoogleAuthCallback_MissingState(t *testing.T) {
 	}
 }
 
+func TestResolveAccount_ReturnsFirstAccount(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "tokens.db")
+
+	store, _ := google.NewTokenStore(dbPath)
+	tok := &oauth2.Token{
+		AccessToken:  "tok",
+		RefreshToken: "ref",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}
+	store.SaveToken("alice@test.com", tok, []string{"openid"})
+	store.Close()
+
+	credPath := filepath.Join(dir, "credentials.json")
+	os.WriteFile(credPath, []byte(testCredsJSON), 0600)
+
+	s := &Server{
+		cfg: &config.Config{},
+		google: google.New(google.Config{
+			CredentialsFile: credPath,
+			TokenDBPath:     dbPath,
+		}),
+	}
+	s.ctx = context.Background()
+
+	account := s.resolveAccount()
+	if account != "alice@test.com" {
+		t.Errorf("resolveAccount = %q, want alice@test.com", account)
+	}
+}
+
+func TestResolveAccount_NoAccounts(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "tokens.db")
+	credPath := filepath.Join(dir, "credentials.json")
+	os.WriteFile(credPath, []byte(testCredsJSON), 0600)
+
+	// Create empty token store.
+	store, _ := google.NewTokenStore(dbPath)
+	store.Close()
+
+	s := &Server{
+		cfg: &config.Config{},
+		google: google.New(google.Config{
+			CredentialsFile: credPath,
+			TokenDBPath:     dbPath,
+		}),
+	}
+	s.ctx = context.Background()
+
+	account := s.resolveAccount()
+	if account != "" {
+		t.Errorf("resolveAccount = %q, want empty", account)
+	}
+}
+
+func TestScopesFromState(t *testing.T) {
+	s := &Server{}
+	scopes := s.scopesFromState("gws-123456")
+	if scopes != nil {
+		t.Errorf("scopesFromState = %v, want nil", scopes)
+	}
+}
+
+const testCredsJSON = `{
+	"installed": {
+		"client_id": "test.apps.googleusercontent.com",
+		"client_secret": "secret",
+		"auth_uri": "https://accounts.google.com/o/oauth2/auth",
+		"token_uri": "https://oauth2.googleapis.com/token",
+		"redirect_uris": ["http://localhost"]
+	}
+}`
+
 func TestHandleGoogleAuthCallback_SignalsWaiter(t *testing.T) {
 	dir := t.TempDir()
 	credPath := filepath.Join(dir, "credentials.json")
-	os.WriteFile(credPath, []byte(`{
-		"installed": {
-			"client_id": "test.apps.googleusercontent.com",
-			"client_secret": "secret",
-			"auth_uri": "https://accounts.google.com/o/oauth2/auth",
-			"token_uri": "https://oauth2.googleapis.com/token",
-			"redirect_uris": ["http://localhost"]
-		}
-	}`), 0600)
+	os.WriteFile(credPath, []byte(testCredsJSON), 0600)
 
 	dbPath := filepath.Join(dir, "tokens.db")
 	store, _ := google.NewTokenStore(dbPath)
