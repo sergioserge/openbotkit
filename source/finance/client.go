@@ -17,17 +17,20 @@ import (
 )
 
 const (
-	cookieURL = "https://fc.yahoo.com"
-	crumbURL  = "https://query2.finance.yahoo.com/v1/test/getcrumb"
-	quoteURL  = "https://query1.finance.yahoo.com/v7/finance/quote"
-	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+	defaultCookieURL = "https://fc.yahoo.com"
+	defaultCrumbURL  = "https://query2.finance.yahoo.com/v1/test/getcrumb"
+	defaultQuoteURL  = "https://query1.finance.yahoo.com/v7/finance/quote"
+	userAgent        = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
 type Client struct {
-	mu     sync.Mutex
-	http   *http.Client
-	crumb  string
-	inited bool
+	mu        sync.Mutex
+	http      *http.Client
+	crumb     string
+	inited    bool
+	cookieURL string
+	crumbURL  string
+	quoteURL  string
 }
 
 func NewClient() *Client {
@@ -37,6 +40,9 @@ func NewClient() *Client {
 			Transport: newChromeTransport(),
 			Jar:       jar,
 		},
+		cookieURL: defaultCookieURL,
+		crumbURL:  defaultCrumbURL,
+		quoteURL:  defaultQuoteURL,
 	}
 }
 
@@ -64,7 +70,7 @@ var errUnauthorized = fmt.Errorf("unauthorized")
 
 func (c *Client) initSession(ctx context.Context) error {
 	// Step 1: Get cookies from fc.yahoo.com (returns 404 body but sets A3 cookie).
-	req, err := http.NewRequestWithContext(ctx, "GET", cookieURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.cookieURL, nil)
 	if err != nil {
 		return err
 	}
@@ -76,7 +82,7 @@ func (c *Client) initSession(ctx context.Context) error {
 	resp.Body.Close()
 
 	// Step 2: Get crumb.
-	req, err = http.NewRequestWithContext(ctx, "GET", crumbURL, nil)
+	req, err = http.NewRequestWithContext(ctx, "GET", c.crumbURL, nil)
 	if err != nil {
 		return err
 	}
@@ -106,7 +112,7 @@ func (c *Client) initSession(ctx context.Context) error {
 
 func (c *Client) fetchQuotes(ctx context.Context, symbols []string) ([]Quote, error) {
 	url := fmt.Sprintf("%s?symbols=%s&crumb=%s",
-		quoteURL, strings.Join(symbols, ","), c.crumb)
+		c.quoteURL, strings.Join(symbols, ","), c.crumb)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
