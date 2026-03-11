@@ -68,7 +68,7 @@ func (c *Client) Quote(ctx context.Context, symbols ...string) ([]Quote, error) 
 	return quotes, err
 }
 
-var errUnauthorized = fmt.Errorf("unauthorized")
+var errUnauthorized = errors.New("unauthorized")
 
 func (c *Client) initSession(ctx context.Context) error {
 	// Step 1: Get cookies from fc.yahoo.com (returns 404 body but sets A3 cookie).
