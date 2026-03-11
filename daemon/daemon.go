@@ -18,6 +18,7 @@ type Daemon struct {
 	skipAppleNotes bool
 	skipWhatsApp   bool
 	skipIMessage   bool
+	skipContacts   bool
 }
 
 type Option func(*Daemon)
@@ -32,6 +33,10 @@ func WithSkipWhatsApp() Option {
 
 func WithSkipIMessage() Option {
 	return func(d *Daemon) { d.skipIMessage = true }
+}
+
+func WithSkipContacts() Option {
+	return func(d *Daemon) { d.skipContacts = true }
 }
 
 func New(cfg *config.Config, opts ...Option) *Daemon {
@@ -68,7 +73,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	slog.Info("river job queue started")
 
-	var waErrCh, anErrCh, imErrCh <-chan error
+	var waErrCh, anErrCh, imErrCh, ctErrCh <-chan error
 	if !d.skipWhatsApp {
 		waErrCh = runWhatsAppSync(ctx, d.cfg)
 	}
@@ -77,6 +82,9 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	if !d.skipIMessage {
 		imErrCh = runIMessageSync(ctx, d.cfg)
+	}
+	if !d.skipContacts {
+		ctErrCh = runContactsSync(ctx, d.cfg)
 	}
 
 	// Block until context is cancelled (signal received).
@@ -97,6 +105,11 @@ func (d *Daemon) Run(ctx context.Context) error {
 	if imErrCh != nil {
 		if err := <-imErrCh; err != nil {
 			slog.Error("imessage error during shutdown", "error", err)
+		}
+	}
+	if ctErrCh != nil {
+		if err := <-ctErrCh; err != nil {
+			slog.Error("contacts error during shutdown", "error", err)
 		}
 	}
 
