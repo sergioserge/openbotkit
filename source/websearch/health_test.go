@@ -71,7 +71,7 @@ func TestHealthTrackerCooldownExpires(t *testing.T) {
 
 	// Backdate the failure.
 	h.mu.Lock()
-	h.backends["brave"].lastFail = time.Now().Add(-2 * minCooldown)
+	h.backends["brave"].lastFail = time.Now().Add(-3 * minCooldown)
 	h.mu.Unlock()
 
 	if !h.IsHealthy("brave") {
