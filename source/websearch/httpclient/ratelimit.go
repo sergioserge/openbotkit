@@ -7,6 +7,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// TODO: evict stale entries if used in a long-lived process.
 type hostRateLimiter struct {
 	mu       sync.Mutex
 	limiters map[string]*rate.Limiter
