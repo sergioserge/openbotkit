@@ -11,9 +11,8 @@ import (
 )
 
 const (
-	ddgURL       = "https://html.duckduckgo.com/html/"
-	ddgUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-	maxQueryLen  = 499
+	ddgURL      = "https://html.duckduckgo.com/html/"
+	maxQueryLen = 499
 )
 
 type DuckDuckGo struct {
@@ -47,7 +46,7 @@ func (d *DuckDuckGo) Search(ctx context.Context, query string, opts SearchOption
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", ddgUserAgent)
+	req.Header.Set("User-Agent", chromeUserAgent)
 	req.Header.Set("Referer", "https://html.duckduckgo.com/")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
