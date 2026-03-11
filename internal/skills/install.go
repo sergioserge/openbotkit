@@ -30,6 +30,7 @@ var builtinSkills = map[string]SkillMeta{
 	"web-search":      {},
 	"web-fetch":       {},
 	"applenotes-read": {RequiresAuth: "applenotes"},
+	"contacts-search": {},
 }
 
 // InstallResult tracks what changed during installation.

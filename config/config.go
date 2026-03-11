@@ -33,6 +33,7 @@ type Config struct {
 	Usage        *UsageConfig        `yaml:"usage,omitempty"`
 	Integrations *IntegrationsConfig `yaml:"integrations,omitempty"`
 	WebSearch    *WebSearchConfig    `yaml:"websearch,omitempty"`
+	Contacts     *ContactsConfig     `yaml:"contacts,omitempty"`
 }
 
 func (c *Config) ResolvedMode() Mode {
@@ -143,6 +144,10 @@ type WebSearchConfig struct {
 	CacheTTL string        `yaml:"cache_ttl,omitempty"`
 }
 
+type ContactsConfig struct {
+	Storage StorageConfig `yaml:"storage,omitempty"`
+}
+
 type StorageConfig struct {
 	Driver string `yaml:"driver,omitempty"` // "sqlite" or "postgres"
 	DSN    string `yaml:"dsn,omitempty"`
@@ -166,8 +171,10 @@ func (c *Config) SourceDataDSN(source string) (string, error) {
 		return c.IMessageDataDSN(), nil
 	case "websearch":
 		return c.WebSearchDataDSN(), nil
+	case "contacts":
+		return c.ContactsDataDSN(), nil
 	default:
-		return "", fmt.Errorf("unknown source: %q (valid: gmail, whatsapp, history, user_memory, applenotes, imessage, usage, websearch)", source)
+		return "", fmt.Errorf("unknown source: %q (valid: gmail, whatsapp, history, user_memory, applenotes, imessage, usage, websearch, contacts)", source)
 	}
 }
 
@@ -256,6 +263,11 @@ func Default() *Config {
 				Driver: "sqlite",
 			},
 		},
+		Contacts: &ContactsConfig{
+			Storage: StorageConfig{
+				Driver: "sqlite",
+			},
+		},
 	}
 	cfg.applyDefaults()
 	return cfg
@@ -318,6 +330,12 @@ func (c *Config) applyDefaults() {
 	}
 	if c.WebSearch.CacheTTL == "" {
 		c.WebSearch.CacheTTL = "15m"
+	}
+	if c.Contacts == nil {
+		c.Contacts = &ContactsConfig{}
+	}
+	if c.Contacts.Storage.Driver == "" {
+		c.Contacts.Storage.Driver = "sqlite"
 	}
 	if c.Daemon == nil {
 		c.Daemon = &DaemonConfig{}
@@ -385,6 +403,13 @@ func (c *Config) IMessageDataDSN() string {
 		return c.IMessage.Storage.DSN
 	}
 	return filepath.Join(SourceDir("imessage"), "data.db")
+}
+
+func (c *Config) ContactsDataDSN() string {
+	if c.Contacts.Storage.DSN != "" {
+		return c.Contacts.Storage.DSN
+	}
+	return filepath.Join(SourceDir("contacts"), "data.db")
 }
 
 func (c *Config) JobsDBDSN() string {
