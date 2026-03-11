@@ -55,15 +55,21 @@ func GetContact(db *store.DB, id int64) (*Contact, error) {
 }
 
 func DeleteContact(db *store.DB, id int64) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("delete contact: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
 	for _, table := range []string{"contact_interactions", "contact_aliases", "contact_identities"} {
-		if _, err := db.Exec(db.Rebind(fmt.Sprintf("DELETE FROM %s WHERE contact_id = ?", table)), id); err != nil {
+		if _, err := tx.Exec(db.Rebind(fmt.Sprintf("DELETE FROM %s WHERE contact_id = ?", table)), id); err != nil {
 			return fmt.Errorf("delete %s: %w", table, err)
 		}
 	}
-	if _, err := db.Exec(db.Rebind("DELETE FROM contacts WHERE id = ?"), id); err != nil {
+	if _, err := tx.Exec(db.Rebind("DELETE FROM contacts WHERE id = ?"), id); err != nil {
 		return fmt.Errorf("delete contact: %w", err)
 	}
-	return nil
+	return tx.Commit()
 }
 
 func ListContacts(db *store.DB, limit, offset int) ([]Contact, error) {
