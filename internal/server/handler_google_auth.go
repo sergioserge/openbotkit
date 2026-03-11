@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/priyanshujain/openbotkit/internal/skills"
 )
 
 func (s *Server) handleGoogleAuthCallback(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +35,12 @@ func (s *Server) handleGoogleAuthCallback(w http.ResponseWriter, r *http.Request
 	}
 
 	s.scopeWaiter.Signal(state, nil)
+
+	go func() {
+		if err := skills.RefreshGWSSkills(s.cfg); err != nil {
+			slog.Warn("gws skill refresh after auth failed", "error", err)
+		}
+	}()
 
 	w.Header().Set("Content-Type", "text/html")
 	fmt.Fprint(w, "<h1>Access granted!</h1><p>You can close this tab.</p>")
