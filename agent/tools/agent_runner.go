@@ -74,9 +74,15 @@ func (r *AgentRunner) Run(ctx context.Context, prompt string, timeout time.Durat
 		o(&ro)
 	}
 	args := r.buildArgs(ro)
+	// Gemini takes prompt as -p argument; others use stdin.
+	if r.info.Kind == AgentGemini {
+		args = append(args, prompt)
+	}
 	cmd := exec.CommandContext(ctx, r.info.Binary, args...)
 	cmd.Env = r.buildEnv()
-	cmd.Stdin = strings.NewReader(prompt)
+	if r.info.Kind != AgentGemini {
+		cmd.Stdin = strings.NewReader(prompt)
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

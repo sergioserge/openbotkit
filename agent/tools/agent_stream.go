@@ -40,9 +40,14 @@ func (r *StreamRunner) RunStream(
 	defer cancel()
 
 	args := r.buildStreamArgs()
+	if r.info.Kind == AgentGemini {
+		args = append(args, "-p", prompt)
+	}
 	cmd := exec.CommandContext(ctx, r.info.Binary, args...)
 	cmd.Env = r.buildEnv()
-	cmd.Stdin = strings.NewReader(prompt)
+	if r.info.Kind != AgentGemini {
+		cmd.Stdin = strings.NewReader(prompt)
+	}
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -91,7 +96,7 @@ func (r *StreamRunner) RunStream(
 func (r *StreamRunner) buildStreamArgs() []string {
 	switch r.info.Kind {
 	case AgentClaude:
-		return []string{"--print", "--output-format", "stream-json"}
+		return []string{"--print", "--verbose", "--output-format", "stream-json"}
 	case AgentGemini:
 		return []string{"-o", "stream-json"}
 	default:

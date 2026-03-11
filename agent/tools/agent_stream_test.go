@@ -56,7 +56,7 @@ func TestParseStreamLine_EmptyType(t *testing.T) {
 func TestStreamRunner_BuildsClaudeStreamArgs(t *testing.T) {
 	r := NewStreamRunner(AgentInfo{Kind: AgentClaude, Binary: "/usr/local/bin/claude"})
 	args := r.buildStreamArgs()
-	want := []string{"--print", "--output-format", "stream-json"}
+	want := []string{"--print", "--verbose", "--output-format", "stream-json"}
 	if len(args) != len(want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
