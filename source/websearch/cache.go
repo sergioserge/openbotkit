@@ -121,6 +121,10 @@ func putSearchHistory(db *store.DB, query, category string, resultCount int, bac
 	db.Exec(q, query, category, resultCount, backendsStr, searchMs)
 }
 
+func (w *WebSearch) ClearCaches() error {
+	return clearAllCaches(w.db)
+}
+
 func clearAllCaches(db *store.DB) error {
 	if db == nil {
 		return nil
