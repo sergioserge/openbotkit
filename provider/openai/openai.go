@@ -107,10 +107,10 @@ func (o *OpenAI) buildRequest(req provider.ChatRequest, stream bool) map[string]
 
 	// Build messages. OpenAI uses system as a message role.
 	var msgs []map[string]any
-	if req.System != "" {
+	if sysText := req.FullSystemText(); sysText != "" {
 		msgs = append(msgs, map[string]any{
 			"role":    "system",
-			"content": req.System,
+			"content": sysText,
 		})
 	}
 	for _, m := range req.Messages {
@@ -247,6 +247,9 @@ func (o *OpenAI) parseResponse(resp *apiResponse) *provider.ChatResponse {
 			InputTokens:  resp.Usage.PromptTokens,
 			OutputTokens: resp.Usage.CompletionTokens,
 		},
+	}
+	if resp.Usage.PromptTokensDetails != nil {
+		result.Usage.CacheReadTokens = resp.Usage.PromptTokensDetails.CachedTokens
 	}
 
 	if len(resp.Choices) == 0 {
@@ -391,8 +394,13 @@ type apiFunction struct {
 }
 
 type apiUsage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
+	PromptTokens        int                  `json:"prompt_tokens"`
+	CompletionTokens    int                  `json:"completion_tokens"`
+	PromptTokensDetails *promptTokensDetails `json:"prompt_tokens_details,omitempty"`
+}
+
+type promptTokensDetails struct {
+	CachedTokens int `json:"cached_tokens"`
 }
 
 type apiError struct {

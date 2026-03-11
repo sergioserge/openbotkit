@@ -30,6 +30,7 @@ type Config struct {
 	IMessage     *IMessageConfig     `yaml:"imessage,omitempty"`
 	UserMemory   *UserMemoryConfig   `yaml:"user_memory,omitempty"`
 	Daemon       *DaemonConfig       `yaml:"daemon,omitempty"`
+	Usage        *UsageConfig        `yaml:"usage,omitempty"`
 	Integrations *IntegrationsConfig `yaml:"integrations,omitempty"`
 }
 
@@ -126,6 +127,10 @@ type AppleNotesConfig struct {
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
 
+type UsageConfig struct {
+	Storage StorageConfig `yaml:"storage,omitempty"`
+}
+
 type IMessageConfig struct {
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
@@ -147,10 +152,12 @@ func (c *Config) SourceDataDSN(source string) (string, error) {
 		return c.UserMemoryDataDSN(), nil
 	case "applenotes":
 		return c.AppleNotesDataDSN(), nil
+	case "usage":
+		return c.UsageDataDSN(), nil
 	case "imessage":
 		return c.IMessageDataDSN(), nil
 	default:
-		return "", fmt.Errorf("unknown source: %q (valid: gmail, whatsapp, history, user_memory, applenotes, imessage)", source)
+		return "", fmt.Errorf("unknown source: %q (valid: gmail, whatsapp, history, user_memory, applenotes, imessage, usage)", source)
 	}
 }
 
@@ -224,6 +231,11 @@ func Default() *Config {
 				Driver: "sqlite",
 			},
 		},
+		Usage: &UsageConfig{
+			Storage: StorageConfig{
+				Driver: "sqlite",
+			},
+		},
 		IMessage: &IMessageConfig{
 			Storage: StorageConfig{
 				Driver: "sqlite",
@@ -267,6 +279,12 @@ func (c *Config) applyDefaults() {
 	}
 	if c.AppleNotes.Storage.Driver == "" {
 		c.AppleNotes.Storage.Driver = "sqlite"
+	}
+	if c.Usage == nil {
+		c.Usage = &UsageConfig{}
+	}
+	if c.Usage.Storage.Driver == "" {
+		c.Usage.Storage.Driver = "sqlite"
 	}
 	if c.IMessage == nil {
 		c.IMessage = &IMessageConfig{}
@@ -312,6 +330,13 @@ func (c *Config) UserMemoryDataDSN() string {
 		return c.UserMemory.Storage.DSN
 	}
 	return filepath.Join(SourceDir("user_memory"), "data.db")
+}
+
+func (c *Config) UsageDataDSN() string {
+	if c.Usage.Storage.DSN != "" {
+		return c.Usage.Storage.DSN
+	}
+	return filepath.Join(SourceDir("usage"), "data.db")
 }
 
 func (c *Config) AppleNotesDataDSN() string {

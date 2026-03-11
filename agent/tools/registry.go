@@ -79,9 +79,13 @@ func (r *Registry) Execute(ctx context.Context, call provider.ToolCall) (string,
 }
 
 // ToolSchemas implements agent.ToolExecutor.
+// Tools are returned in deterministic alphabetical order to maximize
+// cache hits across LLM API calls.
 func (r *Registry) ToolSchemas() []provider.Tool {
-	schemas := make([]provider.Tool, 0, len(r.tools))
-	for _, t := range r.tools {
+	names := r.ToolNames()
+	schemas := make([]provider.Tool, 0, len(names))
+	for _, name := range names {
+		t := r.tools[name]
 		schemas = append(schemas, provider.Tool{
 			Name:        t.Name(),
 			Description: t.Description(),

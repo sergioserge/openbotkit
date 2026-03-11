@@ -149,6 +149,98 @@ func TestStreamChat_TextDelta(t *testing.T) {
 	}
 }
 
+func TestChat_CachedTokens(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(apiResponse{
+			Choices: []apiChoice{
+				{Message: apiMessage{Role: "assistant", Content: "ok"}, FinishReason: "stop"},
+			},
+			Usage: apiUsage{
+				PromptTokens:     100,
+				CompletionTokens: 10,
+				PromptTokensDetails: &promptTokensDetails{
+					CachedTokens: 80,
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	p := New("test-key", WithBaseURL(server.URL))
+	resp, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model:    "gpt-4o",
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if resp.Usage.CacheReadTokens != 80 {
+		t.Errorf("CacheReadTokens = %d, want 80", resp.Usage.CacheReadTokens)
+	}
+	if resp.Usage.InputTokens != 100 {
+		t.Errorf("InputTokens = %d, want 100", resp.Usage.InputTokens)
+	}
+}
+
+func TestChat_NoCachedTokens(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(apiResponse{
+			Choices: []apiChoice{
+				{Message: apiMessage{Role: "assistant", Content: "ok"}, FinishReason: "stop"},
+			},
+			Usage: apiUsage{PromptTokens: 50, CompletionTokens: 5},
+		})
+	}))
+	defer server.Close()
+
+	p := New("test-key", WithBaseURL(server.URL))
+	resp, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model:    "gpt-4o",
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if resp.Usage.CacheReadTokens != 0 {
+		t.Errorf("CacheReadTokens = %d, want 0", resp.Usage.CacheReadTokens)
+	}
+}
+
+func TestChat_SystemBlocks(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		json.NewEncoder(w).Encode(apiResponse{
+			Choices: []apiChoice{
+				{Message: apiMessage{Role: "assistant", Content: "ok"}, FinishReason: "stop"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	p := New("test-key", WithBaseURL(server.URL))
+	_, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model: "gpt-4o",
+		SystemBlocks: []provider.SystemBlock{
+			{Text: "Part 1. "},
+			{Text: "Part 2."},
+		},
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	msgs := capturedBody["messages"].([]any)
+	sysMsg := msgs[0].(map[string]any)
+	if sysMsg["role"] != "system" {
+		t.Errorf("first message role = %q", sysMsg["role"])
+	}
+	if sysMsg["content"] != "Part 1. Part 2." {
+		t.Errorf("system content = %q", sysMsg["content"])
+	}
+}
+
 func TestOpenAIIntegration(t *testing.T) {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {

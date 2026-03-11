@@ -257,11 +257,11 @@ func (f *LocalFixture) Agent(t *testing.T) *agent.Agent {
 	toolReg.Register(&tools.LoadSkillsTool{})
 	toolReg.Register(&tools.SearchSkillsTool{})
 
-	system := "You are a personal AI assistant powered by OpenBotKit.\n" +
-		tools.BuildBaseSystemPrompt(toolReg)
+	identity := "You are a personal AI assistant powered by OpenBotKit.\n"
+	blocks := tools.BuildSystemBlocks(identity, toolReg)
 
 	return agent.New(f.Provider, f.Model, toolReg,
-		agent.WithSystem(system),
+		agent.WithSystemBlocks(blocks),
 		agent.WithMaxIterations(15),
 	)
 }

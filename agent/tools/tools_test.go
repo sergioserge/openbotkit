@@ -30,6 +30,38 @@ func TestRegistryProviderTools(t *testing.T) {
 	}
 }
 
+func TestToolSchemasDeterministicOrder(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&stubTool{name: "zeta"})
+	r.Register(&stubTool{name: "alpha"})
+	r.Register(&stubTool{name: "middle"})
+
+	var first []string
+	for _, s := range r.ToolSchemas() {
+		first = append(first, s.Name)
+	}
+
+	for range 10 {
+		var names []string
+		for _, s := range r.ToolSchemas() {
+			names = append(names, s.Name)
+		}
+		if len(names) != len(first) {
+			t.Fatalf("length changed: %d vs %d", len(names), len(first))
+		}
+		for i, name := range names {
+			if name != first[i] {
+				t.Fatalf("order changed at index %d: %q vs %q", i, name, first[i])
+			}
+		}
+	}
+
+	// Verify alphabetical order.
+	if first[0] != "alpha" || first[1] != "middle" || first[2] != "zeta" {
+		t.Errorf("expected alphabetical order, got %v", first)
+	}
+}
+
 func TestBashEcho(t *testing.T) {
 	b := NewBashTool(5 * time.Second)
 	result, err := b.Execute(context.Background(), json.RawMessage(`{"command":"echo hello"}`))
@@ -227,6 +259,41 @@ func TestRegistryUnknownTool(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unknown tool") {
 		t.Errorf("error = %q, expected unknown tool error", err.Error())
+	}
+}
+
+func TestBuildSystemBlocks_BaseOnly(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "bash"})
+
+	blocks := BuildSystemBlocks("You are an AI.\n", reg)
+	if len(blocks) != 1 {
+		t.Fatalf("got %d blocks, want 1", len(blocks))
+	}
+	if blocks[0].CacheControl == nil || blocks[0].CacheControl.Type != "ephemeral" {
+		t.Error("base block should have ephemeral cache_control")
+	}
+	if !strings.Contains(blocks[0].Text, "You are an AI.") {
+		t.Error("base block should contain identity")
+	}
+	if !strings.Contains(blocks[0].Text, "bash") {
+		t.Error("base block should contain tool names")
+	}
+}
+
+func TestBuildSystemBlocks_WithExtras(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "bash"})
+
+	blocks := BuildSystemBlocks("You are an AI.\n", reg, "\nBe concise.\n", "User likes Go.")
+	if len(blocks) != 2 {
+		t.Fatalf("got %d blocks, want 2", len(blocks))
+	}
+	if blocks[1].CacheControl != nil {
+		t.Error("extras block should not have cache_control")
+	}
+	if blocks[1].Text != "\nBe concise.\nUser likes Go." {
+		t.Errorf("extras text = %q", blocks[1].Text)
 	}
 }
 

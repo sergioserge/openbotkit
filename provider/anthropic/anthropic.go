@@ -147,8 +147,16 @@ func (a *Anthropic) buildRequest(req provider.ChatRequest, stream bool) map[stri
 	if req.MaxTokens == 0 {
 		body["max_tokens"] = 4096
 	}
-	if req.System != "" {
-		body["system"] = req.System
+	if blocks := req.EffectiveSystemBlocks(); len(blocks) > 0 {
+		var systemBlocks []map[string]any
+		for _, block := range blocks {
+			sb := map[string]any{"type": "text", "text": block.Text}
+			if block.CacheControl != nil {
+				sb["cache_control"] = map[string]any{"type": block.CacheControl.Type}
+			}
+			systemBlocks = append(systemBlocks, sb)
+		}
+		body["system"] = systemBlocks
 	}
 	if stream {
 		body["stream"] = true
@@ -162,12 +170,16 @@ func (a *Anthropic) buildRequest(req provider.ChatRequest, stream bool) map[stri
 
 	if len(req.Tools) > 0 {
 		var tools []map[string]any
-		for _, t := range req.Tools {
-			tools = append(tools, map[string]any{
+		for i, t := range req.Tools {
+			tool := map[string]any{
 				"name":         t.Name,
 				"description":  t.Description,
 				"input_schema": json.RawMessage(t.InputSchema),
-			})
+			}
+			if i == len(req.Tools)-1 {
+				tool["cache_control"] = map[string]any{"type": "ephemeral"}
+			}
+			tools = append(tools, tool)
 		}
 		body["tools"] = tools
 	}
@@ -285,8 +297,10 @@ func (a *Anthropic) doRequest(ctx context.Context, body map[string]any) (io.Read
 func (a *Anthropic) parseResponse(resp *apiResponse) *provider.ChatResponse {
 	result := &provider.ChatResponse{
 		Usage: provider.Usage{
-			InputTokens:  resp.Usage.InputTokens,
-			OutputTokens: resp.Usage.OutputTokens,
+			InputTokens:      resp.Usage.InputTokens,
+			OutputTokens:     resp.Usage.OutputTokens,
+			CacheReadTokens:  resp.Usage.CacheReadInputTokens,
+			CacheWriteTokens: resp.Usage.CacheCreationInputTokens,
 		},
 	}
 
@@ -419,8 +433,10 @@ type apiContent struct {
 }
 
 type apiUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 }
 
 type apiError struct {

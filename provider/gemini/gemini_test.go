@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/priyanshujain/openbotkit/internal/envload"
 	"github.com/priyanshujain/openbotkit/provider"
@@ -140,6 +141,156 @@ func TestStreamChat_TextDelta(t *testing.T) {
 	}
 	if text != "Hello world" {
 		t.Errorf("text = %q", text)
+	}
+}
+
+func TestChat_CacheUsage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(apiResponse{
+			Candidates: []apiCandidate{{
+				Content:      apiContent{Role: "model", Parts: []apiPart{{Text: "ok"}}},
+				FinishReason: "STOP",
+			}},
+			UsageMetadata: apiUsage{
+				PromptTokenCount:        100,
+				CandidatesTokenCount:    20,
+				CachedContentTokenCount: 80,
+			},
+		})
+	}))
+	defer server.Close()
+
+	p := New("test-key", WithBaseURL(server.URL))
+	resp, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model:    "gemini-2.5-flash",
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if resp.Usage.CacheReadTokens != 80 {
+		t.Errorf("CacheReadTokens = %d, want 80", resp.Usage.CacheReadTokens)
+	}
+}
+
+func TestChat_SystemBlocks(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		json.NewEncoder(w).Encode(apiResponse{
+			Candidates: []apiCandidate{{
+				Content:      apiContent{Role: "model", Parts: []apiPart{{Text: "ok"}}},
+				FinishReason: "STOP",
+			}},
+		})
+	}))
+	defer server.Close()
+
+	p := New("test-key", WithBaseURL(server.URL))
+	_, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model: "gemini-2.5-flash",
+		SystemBlocks: []provider.SystemBlock{
+			{Text: "Part 1. "},
+			{Text: "Part 2."},
+		},
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	sysInstr, ok := capturedBody["systemInstruction"].(map[string]any)
+	if !ok {
+		t.Fatal("missing systemInstruction")
+	}
+	parts := sysInstr["parts"].([]any)
+	part0 := parts[0].(map[string]any)
+	if part0["text"] != "Part 1. Part 2." {
+		t.Errorf("system text = %q", part0["text"])
+	}
+}
+
+func TestChat_CacheApplied(t *testing.T) {
+	callCount := 0
+	var lastBody map[string]any
+
+	// Cache creation endpoint
+	cacheServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"name":       "cachedContents/test-cache-123",
+				"expireTime": "2099-01-01T00:00:00Z",
+			})
+		}
+	}))
+	defer cacheServer.Close()
+
+	chatServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		json.NewDecoder(r.Body).Decode(&lastBody)
+		json.NewEncoder(w).Encode(apiResponse{
+			Candidates: []apiCandidate{{
+				Content:      apiContent{Role: "model", Parts: []apiPart{{Text: "ok"}}},
+				FinishReason: "STOP",
+			}},
+		})
+	}))
+	defer chatServer.Close()
+
+	p := New("test-key", WithBaseURL(chatServer.URL))
+	// Override the base URL for cache operations too by pre-setting the cache.
+	// For this test, we directly set the cache state to verify the body is modified.
+	p.cacheMu.Lock()
+	p.cachedContentName = "cachedContents/test-cache-123"
+	p.cachedContentHash = p.computeCacheHash(provider.ChatRequest{
+		System: "You are helpful.",
+		Tools:  []provider.Tool{{Name: "bash", InputSchema: json.RawMessage(`{}`)}},
+	})
+	p.cacheExpiry = func() time.Time { t, _ := time.Parse(time.RFC3339, "2099-01-01T00:00:00Z"); return t }()
+	p.cacheMu.Unlock()
+
+	_, err := p.Chat(context.Background(), provider.ChatRequest{
+		Model:    "gemini-2.5-flash",
+		System:   "You are helpful.",
+		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, "Hi")},
+		Tools:    []provider.Tool{{Name: "bash", InputSchema: json.RawMessage(`{}`)}},
+	})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+
+	// When cache is active, body should have cachedContent and lack systemInstruction/tools.
+	if lastBody["cachedContent"] != "cachedContents/test-cache-123" {
+		t.Errorf("cachedContent = %v", lastBody["cachedContent"])
+	}
+	if lastBody["systemInstruction"] != nil {
+		t.Error("systemInstruction should be removed when cache is active")
+	}
+	if lastBody["tools"] != nil {
+		t.Error("tools should be removed when cache is active")
+	}
+}
+
+func TestComputeCacheHash_DifferentInputs(t *testing.T) {
+	g := New("test-key")
+	req1 := provider.ChatRequest{
+		System: "You are helpful.",
+		Tools:  []provider.Tool{{Name: "bash", InputSchema: json.RawMessage(`{}`)}},
+	}
+	req2 := provider.ChatRequest{
+		System: "You are different.",
+		Tools:  []provider.Tool{{Name: "bash", InputSchema: json.RawMessage(`{}`)}},
+	}
+	hash1 := g.computeCacheHash(req1)
+	hash2 := g.computeCacheHash(req2)
+	if hash1 == hash2 {
+		t.Error("different system prompts should produce different hashes")
+	}
+
+	// Same input should produce same hash.
+	hash1b := g.computeCacheHash(req1)
+	if hash1 != hash1b {
+		t.Error("same input should produce same hash")
 	}
 }
 
