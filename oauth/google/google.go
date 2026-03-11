@@ -163,6 +163,35 @@ func (g *Google) RevokeScopes(ctx context.Context, account string, scopes []stri
 	return store.SaveToken(account, tok, remaining)
 }
 
+// ExchangeCode exchanges an OAuth callback code for a token and saves it.
+func (g *Google) ExchangeCode(ctx context.Context, code, account string, scopes []string) error {
+	oauthCfg, err := loadConfig(g.cfg.CredentialsFile, scopes)
+	if err != nil {
+		return err
+	}
+
+	tok, err := oauthCfg.Exchange(ctx, code)
+	if err != nil {
+		return fmt.Errorf("exchange token: %w", err)
+	}
+
+	store, err := NewTokenStore(g.cfg.TokenDBPath)
+	if err != nil {
+		return fmt.Errorf("open token store: %w", err)
+	}
+	defer store.Close()
+
+	allScopes := scopes
+	if account != "" {
+		_, existing, loadErr := store.LoadToken(account)
+		if loadErr == nil {
+			allScopes = mergeScopes(existing, scopes)
+		}
+	}
+
+	return store.SaveToken(account, tok, allScopes)
+}
+
 // AuthURL generates an OAuth consent URL for incremental scope grant.
 // The state parameter correlates with a ScopeWaiter.
 func (g *Google) AuthURL(account string, scopes []string, state string) (string, error) {
