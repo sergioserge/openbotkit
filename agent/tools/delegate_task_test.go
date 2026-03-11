@@ -5,9 +5,55 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+// syncMockInteractor is a thread-safe mock for async tests.
+type syncMockInteractor struct {
+	mu         sync.Mutex
+	notified   []string
+	approvals  []string
+	approveAll bool
+	approveErr error
+	notifyCh   chan string // signals each Notify call
+}
+
+func newSyncMockInteractor(approveAll bool) *syncMockInteractor {
+	return &syncMockInteractor{
+		approveAll: approveAll,
+		notifyCh:   make(chan string, 10),
+	}
+}
+
+func (m *syncMockInteractor) Notify(msg string) error {
+	m.mu.Lock()
+	m.notified = append(m.notified, msg)
+	m.mu.Unlock()
+	m.notifyCh <- msg
+	return nil
+}
+
+func (m *syncMockInteractor) NotifyLink(text, url string) error { return nil }
+
+func (m *syncMockInteractor) RequestApproval(desc string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.approvals = append(m.approvals, desc)
+	if m.approveErr != nil {
+		return false, m.approveErr
+	}
+	return m.approveAll, nil
+}
+
+func (m *syncMockInteractor) getNotified() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := make([]string, len(m.notified))
+	copy(cp, m.notified)
+	return cp
+}
 
 func setupDelegateTest(t *testing.T, approveAll bool) (*DelegateTaskTool, *mockInteractor, *mockAgentRunner) {
 	t.Helper()
@@ -213,5 +259,211 @@ func TestDelegateTask_ApprovalDescription(t *testing.T) {
 	// truncateUTF8 truncates at 80 runes + "..."
 	if len(desc) > len("Delegate to claude: ")+80+3+5 {
 		t.Errorf("approval desc too long: %d chars", len(desc))
+	}
+}
+
+func setupAsyncDelegateTest(t *testing.T, approveAll bool) (*DelegateTaskTool, *syncMockInteractor, *blockingAgentRunner) {
+	t.Helper()
+	inter := newSyncMockInteractor(approveAll)
+	runner := newBlockingRunner("async result", nil)
+	tracker := NewTaskTracker()
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	tool := NewDelegateTaskTool(DelegateTaskConfig{
+		Interactor: inter,
+		Agents:     agents,
+		Timeout:    5 * time.Second,
+		Tracker:    tracker,
+	})
+	tool.runners[AgentClaude] = runner
+	return tool, inter, runner
+}
+
+func TestDelegateTask_AsyncReturnsImmediately(t *testing.T) {
+	tool, _, runner := setupAsyncDelegateTest(t, true)
+	input, _ := json.Marshal(delegateTaskInput{Task: "research async", Async: true})
+	result, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	// Should return immediately with task_id and status.
+	var resp struct {
+		TaskID string `json:"task_id"`
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal([]byte(result), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if resp.TaskID == "" {
+		t.Error("task_id is empty")
+	}
+	if resp.Status != "running" {
+		t.Errorf("status = %q, want running", resp.Status)
+	}
+	// Release the runner so goroutine can finish.
+	close(runner.release)
+	// Wait for goroutine.
+	<-time.After(100 * time.Millisecond)
+}
+
+func TestDelegateTask_AsyncCompleted(t *testing.T) {
+	tool, inter, runner := setupAsyncDelegateTest(t, true)
+	input, _ := json.Marshal(delegateTaskInput{Task: "research", Async: true})
+	result, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	var resp struct{ TaskID string `json:"task_id"` }
+	json.Unmarshal([]byte(result), &resp)
+
+	// Wait for goroutine to start, then release.
+	<-runner.called
+	close(runner.release)
+	// Wait for completion notification via channel.
+	select {
+	case <-inter.notifyCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for notification")
+	}
+
+	rec, ok := tool.tracker.Get(resp.TaskID)
+	if !ok {
+		t.Fatal("task not found in tracker")
+	}
+	if rec.Status != TaskCompleted {
+		t.Errorf("status = %q, want completed", rec.Status)
+	}
+	if rec.Output != "async result" {
+		t.Errorf("output = %q", rec.Output)
+	}
+	// Check completion notification.
+	found := false
+	for _, n := range inter.getNotified() {
+		if strings.Contains(n, "Task completed") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("missing completion notification, got: %v", inter.getNotified())
+	}
+}
+
+func TestDelegateTask_AsyncFailed(t *testing.T) {
+	inter := newSyncMockInteractor(true)
+	runner := newBlockingRunner("", errors.New("agent crashed"))
+	tracker := NewTaskTracker()
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	tool := NewDelegateTaskTool(DelegateTaskConfig{
+		Interactor: inter,
+		Agents:     agents,
+		Timeout:    5 * time.Second,
+		Tracker:    tracker,
+	})
+	tool.runners[AgentClaude] = runner
+
+	input, _ := json.Marshal(delegateTaskInput{Task: "failing task", Async: true})
+	result, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	var resp struct{ TaskID string `json:"task_id"` }
+	json.Unmarshal([]byte(result), &resp)
+
+	<-runner.called
+	close(runner.release)
+	// Wait for failure notification via channel.
+	select {
+	case <-inter.notifyCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for notification")
+	}
+
+	rec, ok := tracker.Get(resp.TaskID)
+	if !ok {
+		t.Fatal("task not found")
+	}
+	if rec.Status != TaskFailed {
+		t.Errorf("status = %q, want failed", rec.Status)
+	}
+	found := false
+	for _, n := range inter.getNotified() {
+		if strings.Contains(n, "Task failed") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("missing failure notification, got: %v", inter.getNotified())
+	}
+}
+
+func TestDelegateTask_AsyncMaxConcurrent(t *testing.T) {
+	inter := newSyncMockInteractor(true)
+	tracker := NewTaskTracker()
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+
+	// Pre-fill tracker to max.
+	tracker.Start("t1", "task1", AgentClaude)
+	tracker.Start("t2", "task2", AgentClaude)
+	tracker.Start("t3", "task3", AgentClaude)
+
+	tool := NewDelegateTaskTool(DelegateTaskConfig{
+		Interactor: inter,
+		Agents:     agents,
+		Timeout:    5 * time.Second,
+		Tracker:    tracker,
+	})
+	runner := &mockAgentRunner{output: "result"}
+	tool.runners[AgentClaude] = runner
+
+	input, _ := json.Marshal(delegateTaskInput{Task: "4th task", Async: true})
+	_, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error for max concurrent")
+	}
+	if !strings.Contains(err.Error(), "concurrent") {
+		t.Errorf("error = %q", err.Error())
+	}
+}
+
+func TestDelegateTask_AsyncWithoutTracker(t *testing.T) {
+	// Tracker is nil, async=true should fall back to sync.
+	tool, _, runner := setupDelegateTest(t, true)
+	input, _ := json.Marshal(delegateTaskInput{Task: "sync fallback", Async: true})
+	result, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !runner.called {
+		t.Error("runner should have been called synchronously")
+	}
+	if result != "research result" {
+		t.Errorf("result = %q", result)
+	}
+}
+
+func TestDelegateTask_SyncIgnoresTracker(t *testing.T) {
+	inter := &mockInteractor{approveAll: true}
+	runner := &mockAgentRunner{output: "sync result"}
+	tracker := NewTaskTracker()
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	tool := NewDelegateTaskTool(DelegateTaskConfig{
+		Interactor: inter,
+		Agents:     agents,
+		Timeout:    5 * time.Second,
+		Tracker:    tracker,
+	})
+	tool.runners[AgentClaude] = runner
+
+	input, _ := json.Marshal(delegateTaskInput{Task: "sync task", Async: false})
+	result, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result != "sync result" {
+		t.Errorf("result = %q", result)
+	}
+	if tracker.RunningCount() != 0 {
+		t.Error("tracker should have no tasks for sync execution")
 	}
 }

@@ -2,6 +2,8 @@ package tools
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -15,6 +17,7 @@ type DelegateTaskConfig struct {
 	Interactor Interactor
 	Agents     []AgentInfo
 	Timeout    time.Duration // default 5m
+	Tracker    *TaskTracker  // nil = sync-only (Phase 1 behavior)
 }
 
 // DelegateTaskTool delegates complex tasks to external AI CLI agents.
@@ -23,6 +26,7 @@ type DelegateTaskTool struct {
 	agents     []AgentInfo
 	timeout    time.Duration
 	runners    map[AgentKind]AgentRunnerInterface
+	tracker    *TaskTracker
 }
 
 // NewDelegateTaskTool creates a new delegate_task tool.
@@ -40,6 +44,7 @@ func NewDelegateTaskTool(cfg DelegateTaskConfig) *DelegateTaskTool {
 		agents:     cfg.Agents,
 		timeout:    timeout,
 		runners:    runners,
+		tracker:    cfg.Tracker,
 	}
 }
 
@@ -62,6 +67,10 @@ func (d *DelegateTaskTool) InputSchema() json.RawMessage {
 			"type": "string",
 			"enum": %s,
 			"description": "Which agent to use (auto-selects best available if omitted)"
+		},
+		"async": {
+			"type": "boolean",
+			"description": "Run in background and return immediately with a task_id (default false)"
 		}
 	},
 	"required": ["task"]
@@ -71,6 +80,7 @@ func (d *DelegateTaskTool) InputSchema() json.RawMessage {
 type delegateTaskInput struct {
 	Task  string `json:"task"`
 	Agent string `json:"agent,omitempty"`
+	Async bool   `json:"async,omitempty"`
 }
 
 func (d *DelegateTaskTool) Execute(ctx context.Context, input json.RawMessage) (string, error) {
@@ -90,9 +100,79 @@ func (d *DelegateTaskTool) Execute(ctx context.Context, input json.RawMessage) (
 	preview := truncateUTF8(in.Task, 80)
 	desc := fmt.Sprintf("Delegate to %s: %s", kind, preview)
 
+	// Async mode: if tracker is set and async requested, run in background.
+	if in.Async && d.tracker != nil {
+		return d.executeAsync(ctx, runner, kind, in.Task, preview, desc)
+	}
+
 	return GuardedWrite(ctx, d.interactor, desc, func() (string, error) {
 		return runner.Run(ctx, in.Task, d.timeout)
 	})
+}
+
+func (d *DelegateTaskTool) executeAsync(
+	ctx context.Context,
+	runner AgentRunnerInterface,
+	kind AgentKind,
+	task, preview, desc string,
+) (string, error) {
+	taskID, err := generateTaskID()
+	if err != nil {
+		return "", fmt.Errorf("generate task ID: %w", err)
+	}
+
+	if err := d.tracker.Start(taskID, task, kind); err != nil {
+		return "", err
+	}
+
+	// Get approval before launching background goroutine.
+	approved, err := d.interactor.RequestApproval(desc)
+	if err != nil {
+		d.tracker.Fail(taskID, err.Error())
+		return "", fmt.Errorf("approval: %w", err)
+	}
+	if !approved {
+		d.tracker.Fail(taskID, "denied by user")
+		if nerr := d.interactor.Notify("Action not performed."); nerr != nil {
+			return "", fmt.Errorf("notify denial: %w", nerr)
+		}
+		return "denied_by_user", nil
+	}
+
+	go d.runAsync(runner, kind, task, preview, taskID)
+
+	resp := struct {
+		TaskID string `json:"task_id"`
+		Status string `json:"status"`
+	}{TaskID: taskID, Status: "running"}
+	data, _ := json.Marshal(resp)
+	return string(data), nil
+}
+
+func (d *DelegateTaskTool) runAsync(
+	runner AgentRunnerInterface,
+	kind AgentKind,
+	task, preview, taskID string,
+) {
+	ctx, cancel := context.WithTimeout(context.Background(), d.timeout)
+	defer cancel()
+
+	output, err := runner.Run(ctx, task, d.timeout)
+	if err != nil {
+		d.tracker.Fail(taskID, err.Error())
+		d.interactor.Notify(fmt.Sprintf("Task failed: %s. %s", preview, err))
+		return
+	}
+	d.tracker.Complete(taskID, output)
+	d.interactor.Notify(fmt.Sprintf("Task completed: %s. Use check_task to see results.", preview))
+}
+
+func generateTaskID() (string, error) {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
 }
 
 func (d *DelegateTaskTool) selectRunner(agent string) (AgentRunnerInterface, AgentKind, error) {
