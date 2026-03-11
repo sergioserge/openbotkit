@@ -244,3 +244,25 @@ func TestFetchEmptyURL(t *testing.T) {
 		t.Fatal("expected error for empty URL")
 	}
 }
+
+func TestFetchResponseBodyCapped(t *testing.T) {
+	// Serve a body larger than maxResponseBody (10 MB).
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		// Write 11 MB (more than the 10 MB cap).
+		chunk := strings.Repeat("x", 1<<20) // 1 MB
+		for range 11 {
+			fmt.Fprint(w, chunk)
+		}
+	}))
+	defer srv.Close()
+
+	ws := &WebSearch{skipSSRF: true}
+	result, err := ws.Fetch(context.Background(), srv.URL, FetchOptions{MaxLength: 12 << 20})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Content) > maxResponseBody+100 {
+		t.Errorf("body not capped: got %d bytes", len(result.Content))
+	}
+}

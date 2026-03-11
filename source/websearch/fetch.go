@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	defaultMaxLength = 100000
-	defaultFormat    = "markdown"
-	fetchUserAgent   = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+	defaultMaxLength  = 100000
+	defaultFormat     = "markdown"
+	maxResponseBody   = 10 << 20 // 10 MB hard cap on response body
+	fetchUserAgent    = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
 func (w *WebSearch) Fetch(ctx context.Context, rawURL string, opts FetchOptions) (*FetchResult, error) {
@@ -59,7 +60,7 @@ func (w *WebSearch) Fetch(ctx context.Context, rawURL string, opts FetchOptions)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
