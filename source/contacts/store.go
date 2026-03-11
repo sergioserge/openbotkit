@@ -9,28 +9,6 @@ import (
 	"github.com/priyanshujain/openbotkit/store"
 )
 
-func UpsertContact(db *store.DB, displayName string) (int64, error) {
-	var id int64
-	err := db.QueryRow(
-		db.Rebind(`INSERT INTO contacts (display_name) VALUES (?)
-			ON CONFLICT DO NOTHING RETURNING id`),
-		displayName,
-	).Scan(&id)
-	if err == sql.ErrNoRows {
-		// SQLite ON CONFLICT DO NOTHING won't return; look up by display_name.
-		// This is only for the initial insert path; callers should use
-		// FindContactByIdentity for dedup.
-		err = db.QueryRow(
-			db.Rebind("SELECT id FROM contacts WHERE display_name = ? LIMIT 1"),
-			displayName,
-		).Scan(&id)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("upsert contact: %w", err)
-	}
-	return id, nil
-}
-
 func CreateContact(db *store.DB, displayName string) (int64, error) {
 	result, err := db.Exec(
 		db.Rebind("INSERT INTO contacts (display_name) VALUES (?)"),
