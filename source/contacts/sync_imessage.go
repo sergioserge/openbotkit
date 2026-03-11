@@ -25,11 +25,12 @@ func syncFromIMessage(contactsDB, imDB *store.DB) (*SyncResult, error) {
 	}
 	var handles []imHandle
 	for rows.Next() {
-		var h imHandle
-		if err := rows.Scan(&h.handleID, &h.service); err != nil {
+		var handleID sql.NullString
+		var service sql.NullString
+		if err := rows.Scan(&handleID, &service); err != nil {
 			return nil, fmt.Errorf("scan imessage handle: %w", err)
 		}
-		handles = append(handles, h)
+		handles = append(handles, imHandle{handleID: handleID.String, service: service.String})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -106,11 +107,11 @@ func lookupIMDisplayName(imDB *store.DB, handleID string) string {
 
 func syncIMessageInteractions(contactsDB, imDB *store.DB, contactID int64, handleID string) error {
 	var count int
-	var lastAt sql.NullTime
+	var lastAtRaw sql.NullString
 	err := imDB.QueryRow(
 		imDB.Rebind("SELECT COUNT(*), MAX(date_utc) FROM imessage_messages WHERE sender_id = ?"),
 		handleID,
-	).Scan(&count, &lastAt)
+	).Scan(&count, &lastAtRaw)
 	if err != nil {
 		return err
 	}
@@ -118,8 +119,12 @@ func syncIMessageInteractions(contactsDB, imDB *store.DB, contactID int64, handl
 		return nil
 	}
 	var t *time.Time
-	if lastAt.Valid {
-		t = &lastAt.Time
+	if lastAtRaw.Valid && lastAtRaw.String != "" {
+		if parsed, err := time.Parse("2006-01-02 15:04:05", lastAtRaw.String); err == nil {
+			t = &parsed
+		} else if parsed, err := time.Parse(time.RFC3339, lastAtRaw.String); err == nil {
+			t = &parsed
+		}
 	}
 	return UpsertInteraction(contactsDB, contactID, "imessage", count, t)
 }

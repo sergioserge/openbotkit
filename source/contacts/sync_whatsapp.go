@@ -23,11 +23,16 @@ func syncFromWhatsApp(contactsDB, waDB *store.DB) (*SyncResult, error) {
 	}
 	var contacts []waContact
 	for rows.Next() {
-		var c waContact
-		if err := rows.Scan(&c.jid, &c.phone, &c.firstName, &c.fullName, &c.pushName, &c.businessName); err != nil {
+		var jid, phone sql.NullString
+		var firstName, fullName, pushName, businessName sql.NullString
+		if err := rows.Scan(&jid, &phone, &firstName, &fullName, &pushName, &businessName); err != nil {
 			return nil, fmt.Errorf("scan whatsapp contact: %w", err)
 		}
-		contacts = append(contacts, c)
+		contacts = append(contacts, waContact{
+			jid: jid.String, phone: phone.String,
+			firstName: firstName.String, fullName: fullName.String,
+			pushName: pushName.String, businessName: businessName.String,
+		})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -90,11 +95,11 @@ func syncFromWhatsApp(contactsDB, waDB *store.DB) (*SyncResult, error) {
 
 func syncWhatsAppInteractions(contactsDB, waDB *store.DB, contactID int64, jid string) error {
 	var count int
-	var lastAt sql.NullTime
+	var lastAtRaw sql.NullString
 	err := waDB.QueryRow(
 		waDB.Rebind("SELECT COUNT(*), MAX(timestamp) FROM whatsapp_messages WHERE sender_jid = ? OR chat_jid = ?"),
 		jid, jid,
-	).Scan(&count, &lastAt)
+	).Scan(&count, &lastAtRaw)
 	if err != nil {
 		return err
 	}
@@ -102,8 +107,12 @@ func syncWhatsAppInteractions(contactsDB, waDB *store.DB, contactID int64, jid s
 		return nil
 	}
 	var t *time.Time
-	if lastAt.Valid {
-		t = &lastAt.Time
+	if lastAtRaw.Valid && lastAtRaw.String != "" {
+		if parsed, err := time.Parse("2006-01-02 15:04:05", lastAtRaw.String); err == nil {
+			t = &parsed
+		} else if parsed, err := time.Parse(time.RFC3339, lastAtRaw.String); err == nil {
+			t = &parsed
+		}
 	}
 	return UpsertInteraction(contactsDB, contactID, "whatsapp", count, t)
 }
