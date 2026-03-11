@@ -28,8 +28,8 @@ func (d *DuckDuckGo) Name() string  { return "duckduckgo" }
 func (d *DuckDuckGo) Priority() int { return 1 }
 
 func (d *DuckDuckGo) Search(ctx context.Context, query string, opts SearchOptions) ([]Result, error) {
-	if len(query) > maxQueryLen {
-		query = string([]rune(query)[:maxQueryLen])
+	if runes := []rune(query); len(runes) > maxQueryLen {
+		query = string(runes[:maxQueryLen])
 	}
 
 	form := url.Values{}
