@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 )
@@ -191,6 +192,9 @@ func TestAgentRunner_RealGemini(t *testing.T) {
 	r := NewAgentRunner(info)
 	out, err := r.Run(context.Background(), "Say hello in exactly one word.", 30*time.Second)
 	if err != nil {
+		if strings.Contains(err.Error(), "Permission") || strings.Contains(err.Error(), "denied") || strings.Contains(err.Error(), "auth") {
+			t.Skipf("gemini auth not configured: %v", err)
+		}
 		t.Fatalf("Run: %v", err)
 	}
 	if out == "" {
