@@ -31,27 +31,32 @@ func openTestDB(t *testing.T) *store.DB {
 }
 
 func TestCacheKeyDeterminism(t *testing.T) {
-	k1 := cacheKey("golang", "web", "auto", "us-en", "")
-	k2 := cacheKey("golang", "web", "auto", "us-en", "")
+	k1 := cacheKey("golang", "web", "auto", "us-en", "", 0)
+	k2 := cacheKey("golang", "web", "auto", "us-en", "", 0)
 	if k1 != k2 {
 		t.Errorf("same inputs should produce same key: %q != %q", k1, k2)
 	}
 
-	k3 := cacheKey("golang", "news", "auto", "us-en", "")
+	k3 := cacheKey("golang", "news", "auto", "us-en", "", 0)
 	if k1 == k3 {
 		t.Errorf("different category should produce different key")
 	}
 
-	k4 := cacheKey("rust", "web", "auto", "us-en", "")
+	k4 := cacheKey("rust", "web", "auto", "us-en", "", 0)
 	if k1 == k4 {
 		t.Errorf("different query should produce different key")
+	}
+
+	k5 := cacheKey("golang", "web", "auto", "us-en", "", 2)
+	if k1 == k5 {
+		t.Errorf("different page should produce different key")
 	}
 }
 
 func TestSearchCacheRoundTrip(t *testing.T) {
 	db := openTestDB(t)
 
-	key := cacheKey("golang", "web", "auto", "us-en", "")
+	key := cacheKey("golang", "web", "auto", "us-en", "", 0)
 	results := []Result{
 		{Title: "Go", URL: "https://go.dev", Snippet: "Go lang", Source: "duckduckgo"},
 	}
@@ -79,7 +84,7 @@ func TestSearchCacheRoundTrip(t *testing.T) {
 func TestSearchCacheTTLExpiry(t *testing.T) {
 	db := openTestDB(t)
 
-	key := cacheKey("test", "web", "auto", "us-en", "")
+	key := cacheKey("test", "web", "auto", "us-en", "", 0)
 	putSearchCache(db, key, "test", "web", []Result{{Title: "T", URL: "https://t.com", Source: "mock"}})
 
 	// Manually backdate the entry.

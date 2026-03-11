@@ -29,7 +29,7 @@ func (w *WebSearch) Search(ctx context.Context, query string, opts SearchOptions
 	}
 
 	if !opts.NoCache {
-		key := cacheKey(query, "web", opts.Backend, opts.Region, opts.TimeLimit)
+		key := cacheKey(query, "web", opts.Backend, opts.Region, opts.TimeLimit, opts.Page)
 		if cached, ok := getSearchCache(w.db, key, w.cacheTTL()); ok {
 			return cached, nil
 		}
@@ -47,7 +47,7 @@ func (w *WebSearch) Search(ctx context.Context, query string, opts SearchOptions
 	}
 
 	if !opts.NoCache {
-		key := cacheKey(query, "web", opts.Backend, opts.Region, opts.TimeLimit)
+		key := cacheKey(query, "web", opts.Backend, opts.Region, opts.TimeLimit, opts.Page)
 		putSearchCache(w.db, key, query, "web", result.Results)
 	}
 
@@ -172,7 +172,7 @@ func (w *WebSearch) News(ctx context.Context, query string, opts SearchOptions) 
 	}
 
 	if !opts.NoCache {
-		key := cacheKey(query, "news", opts.Backend, opts.Region, opts.TimeLimit)
+		key := cacheKey(query, "news", opts.Backend, opts.Region, opts.TimeLimit, opts.Page)
 		if cached, ok := getSearchCache(w.db, key, w.cacheTTL()); ok {
 			return cached, nil
 		}
@@ -190,7 +190,7 @@ func (w *WebSearch) News(ctx context.Context, query string, opts SearchOptions) 
 	}
 
 	if !opts.NoCache {
-		key := cacheKey(query, "news", opts.Backend, opts.Region, opts.TimeLimit)
+		key := cacheKey(query, "news", opts.Backend, opts.Region, opts.TimeLimit, opts.Page)
 		putSearchCache(w.db, key, query, "news", result.Results)
 	}
 

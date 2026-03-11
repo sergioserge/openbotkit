@@ -10,9 +10,9 @@ import (
 	"github.com/priyanshujain/openbotkit/store"
 )
 
-func cacheKey(query, category, backend, region, timeLimit string) string {
+func cacheKey(query, category, backend, region, timeLimit string, page int) string {
 	h := sha256.New()
-	fmt.Fprintf(h, "%s|%s|%s|%s|%s", query, category, backend, region, timeLimit)
+	fmt.Fprintf(h, "%s|%s|%s|%s|%s|%d", query, category, backend, region, timeLimit, page)
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 

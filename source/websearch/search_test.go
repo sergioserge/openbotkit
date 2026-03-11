@@ -398,7 +398,7 @@ func TestSearchCacheIntegration(t *testing.T) {
 	}
 
 	// Populate cache as Search() would.
-	key := cacheKey("test", "web", "auto", "us-en", "")
+	key := cacheKey("test", "web", "auto", "us-en", "", 0)
 	putSearchCache(db, key, "test", "web", r1.Results)
 
 	// Second call — cache hit, engine NOT called again.
@@ -418,7 +418,7 @@ func TestSearchNoCacheBypass(t *testing.T) {
 	db := openTestDB(t)
 
 	// Pre-populate cache.
-	key := cacheKey("bypass-test", "web", "auto", "us-en", "")
+	key := cacheKey("bypass-test", "web", "auto", "us-en", "", 0)
 	putSearchCache(db, key, "bypass-test", "web", []Result{
 		{Title: "Cached", URL: "https://cached.com", Source: "cache"},
 	})
