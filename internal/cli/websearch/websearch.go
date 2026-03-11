@@ -11,4 +11,5 @@ func init() {
 	Cmd.AddCommand(searchCmd)
 	Cmd.AddCommand(fetchCmd)
 	Cmd.AddCommand(newsCmd)
+	Cmd.AddCommand(backendsCmd)
 }
