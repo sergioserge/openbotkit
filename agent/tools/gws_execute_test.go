@@ -195,7 +195,8 @@ func TestGWSExecute_MissingScopeSignaled(t *testing.T) {
 		TokenDBPath:     dbPath,
 	})
 	bridge := NewTokenBridge(g, "user@test.com")
-	inter := &mockInteractor{approveAll: false}
+	linkCh := make(chan struct{ text, url string }, 1)
+	inter := &mockInteractor{approveAll: false, linkCh: linkCh}
 	runner := &mockRunner{outputs: map[string]string{"calendar events.list": `{"items":[]}`}}
 
 	waiter := google.NewScopeWaiter()
@@ -230,22 +231,16 @@ func TestGWSExecute_MissingScopeSignaled(t *testing.T) {
 		close(done)
 	}()
 
-	// Wait for the auth link to be sent.
-	deadline := time.After(3 * time.Second)
-	for {
-		if len(inter.links) > 0 {
-			break
-		}
-		select {
-		case <-deadline:
-			t.Fatal("timed out waiting for auth link")
-		default:
-			time.Sleep(10 * time.Millisecond)
-		}
+	// Wait for the auth link to be sent via channel (race-free).
+	var link struct{ text, url string }
+	select {
+	case link = <-linkCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for auth link")
 	}
 
 	// Extract state from the auth link URL.
-	linkURL := inter.links[0].url
+	linkURL := link.url
 	stateIdx := strings.Index(linkURL, "state=")
 	if stateIdx < 0 {
 		t.Fatal("auth link missing state param")

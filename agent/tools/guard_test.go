@@ -3,29 +3,42 @@ package tools
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 )
 
 type mockInteractor struct {
+	mu         sync.Mutex
 	notified   []string
 	links      []struct{ text, url string }
 	approvals  []string
 	approveAll bool
 	approveErr error
 	notifyErr  error
+	linkCh     chan struct{ text, url string } // optional signal for NotifyLink
 }
 
 func (m *mockInteractor) Notify(msg string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.notified = append(m.notified, msg)
 	return m.notifyErr
 }
 
 func (m *mockInteractor) NotifyLink(text, url string) error {
+	m.mu.Lock()
 	m.links = append(m.links, struct{ text, url string }{text, url})
+	ch := m.linkCh
+	m.mu.Unlock()
+	if ch != nil {
+		ch <- struct{ text, url string }{text, url}
+	}
 	return nil
 }
 
 func (m *mockInteractor) RequestApproval(desc string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.approvals = append(m.approvals, desc)
 	if m.approveErr != nil {
 		return false, m.approveErr
