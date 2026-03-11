@@ -87,7 +87,7 @@ func (w *WebSearch) searchWithEngines(ctx context.Context, query string, opts Se
 		return nil, fmt.Errorf("all backends failed: %w", lastErr)
 	}
 
-	allResults = dedup(allResults)
+	allResults = rankResults(allResults, query)
 
 	if len(allResults) > opts.MaxResults {
 		allResults = allResults[:opts.MaxResults]
@@ -203,7 +203,7 @@ func (w *WebSearch) newsWithEngines(ctx context.Context, query string, opts Sear
 		return nil, fmt.Errorf("all news backends failed: %w", lastErr)
 	}
 
-	allResults = dedup(allResults)
+	allResults = rankResults(allResults, query)
 
 	if len(allResults) > opts.MaxResults {
 		allResults = allResults[:opts.MaxResults]
@@ -236,20 +236,6 @@ func buildNewsEngines(client *http.Client, backend string) []NewsEngine {
 	default:
 		return nil
 	}
-}
-
-func dedup(results []Result) []Result {
-	seen := make(map[string]bool)
-	var out []Result
-	for _, r := range results {
-		key := normalizeURL(r.URL)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		out = append(out, r)
-	}
-	return out
 }
 
 func normalizeURL(raw string) string {
