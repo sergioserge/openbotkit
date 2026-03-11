@@ -66,6 +66,7 @@ func setupDelegateTest(t *testing.T, approveAll bool) (*DelegateTaskTool, *mockI
 		Timeout:    5 * time.Second,
 	})
 	tool.runners[AgentClaude] = runner
+	tool.streamRunners[AgentClaude] = nil // disable streaming in tests
 	return tool, inter, runner
 }
 
@@ -172,6 +173,8 @@ func TestDelegateTask_ExplicitAgent(t *testing.T) {
 	})
 	tool.runners[AgentClaude] = claudeRunner
 	tool.runners[AgentGemini] = geminiRunner
+	tool.streamRunners[AgentClaude] = nil
+	tool.streamRunners[AgentGemini] = nil
 
 	input, _ := json.Marshal(delegateTaskInput{Task: "research", Agent: "gemini"})
 	result, err := tool.Execute(context.Background(), input)
@@ -275,6 +278,7 @@ func setupAsyncDelegateTest(t *testing.T, approveAll bool) (*DelegateTaskTool, *
 		Tracker:    tracker,
 	})
 	tool.runners[AgentClaude] = runner
+	tool.streamRunners[AgentClaude] = nil // disable streaming, use mock runner
 	return tool, inter, runner
 }
 
@@ -360,6 +364,7 @@ func TestDelegateTask_AsyncFailed(t *testing.T) {
 		Tracker:    tracker,
 	})
 	tool.runners[AgentClaude] = runner
+	tool.streamRunners[AgentClaude] = nil
 
 	input, _ := json.Marshal(delegateTaskInput{Task: "failing task", Async: true})
 	result, err := tool.Execute(context.Background(), input)
@@ -415,6 +420,7 @@ func TestDelegateTask_AsyncMaxConcurrent(t *testing.T) {
 	})
 	runner := &mockAgentRunner{output: "result"}
 	tool.runners[AgentClaude] = runner
+	tool.streamRunners[AgentClaude] = nil
 
 	input, _ := json.Marshal(delegateTaskInput{Task: "4th task", Async: true})
 	_, err := tool.Execute(context.Background(), input)
@@ -454,6 +460,7 @@ func TestDelegateTask_SyncIgnoresTracker(t *testing.T) {
 		Tracker:    tracker,
 	})
 	tool.runners[AgentClaude] = runner
+	tool.streamRunners[AgentClaude] = nil
 
 	input, _ := json.Marshal(delegateTaskInput{Task: "sync task", Async: false})
 	result, err := tool.Execute(context.Background(), input)

@@ -20,13 +20,16 @@ type DelegateTaskConfig struct {
 	Tracker    *TaskTracker  // nil = sync-only (Phase 1 behavior)
 }
 
+const progressThrottle = 30 * time.Second
+
 // DelegateTaskTool delegates complex tasks to external AI CLI agents.
 type DelegateTaskTool struct {
-	interactor Interactor
-	agents     []AgentInfo
-	timeout    time.Duration
-	runners    map[AgentKind]AgentRunnerInterface
-	tracker    *TaskTracker
+	interactor    Interactor
+	agents        []AgentInfo
+	timeout       time.Duration
+	runners       map[AgentKind]AgentRunnerInterface
+	streamRunners map[AgentKind]*StreamRunner
+	tracker       *TaskTracker
 }
 
 // NewDelegateTaskTool creates a new delegate_task tool.
@@ -36,15 +39,18 @@ func NewDelegateTaskTool(cfg DelegateTaskConfig) *DelegateTaskTool {
 		timeout = defaultDelegateTimeout
 	}
 	runners := make(map[AgentKind]AgentRunnerInterface, len(cfg.Agents))
+	streamRunners := make(map[AgentKind]*StreamRunner, len(cfg.Agents))
 	for _, a := range cfg.Agents {
 		runners[a.Kind] = NewAgentRunner(a)
+		streamRunners[a.Kind] = NewStreamRunner(a)
 	}
 	return &DelegateTaskTool{
-		interactor: cfg.Interactor,
-		agents:     cfg.Agents,
-		timeout:    timeout,
-		runners:    runners,
-		tracker:    cfg.Tracker,
+		interactor:    cfg.Interactor,
+		agents:        cfg.Agents,
+		timeout:       timeout,
+		runners:       runners,
+		streamRunners: streamRunners,
+		tracker:       cfg.Tracker,
 	}
 }
 
@@ -200,6 +206,27 @@ func (d *DelegateTaskTool) runAsync(
 	ctx, cancel := context.WithTimeout(context.Background(), d.timeout)
 	defer cancel()
 
+	// Try streaming runner for progress reporting.
+	if sr, ok := d.streamRunners[kind]; ok && sr != nil {
+		var lastNotify time.Time
+		onEvent := func(evt StreamEvent) {
+			if time.Since(lastNotify) > progressThrottle && (evt.Type == "result" || evt.Type == "text") {
+				d.interactor.Notify(fmt.Sprintf("Task %s progress: %s", taskID[:8], truncateUTF8(evt.Content, 200)))
+				lastNotify = time.Now()
+			}
+		}
+		output, err := sr.RunStream(ctx, task, d.timeout, onEvent)
+		if err != nil {
+			d.tracker.Fail(taskID, err.Error())
+			d.interactor.Notify(fmt.Sprintf("Task failed: %s. %s", preview, err))
+			return
+		}
+		d.tracker.Complete(taskID, output)
+		d.interactor.Notify(fmt.Sprintf("Task completed: %s. Use check_task to see results.", preview))
+		return
+	}
+
+	// Fallback to non-streaming runner.
 	output, err := runner.Run(ctx, task, d.timeout, runOpts...)
 	if err != nil {
 		d.tracker.Fail(taskID, err.Error())
