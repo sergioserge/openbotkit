@@ -55,7 +55,7 @@ func (d *DuckDuckGo) News(ctx context.Context, query string, opts SearchOptions)
 		return nil, fmt.Errorf("duckduckgo news returned status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return nil, fmt.Errorf("read news response: %w", err)
 	}
@@ -109,7 +109,7 @@ func (d *DuckDuckGo) fetchVQD(ctx context.Context, query string) (string, error)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return "", fmt.Errorf("read vqd page: %w", err)
 	}
