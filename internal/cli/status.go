@@ -10,10 +10,12 @@ import (
 	"github.com/priyanshujain/openbotkit/oauth/google"
 	"github.com/priyanshujain/openbotkit/source"
 	ansrc "github.com/priyanshujain/openbotkit/source/applenotes"
+	finsrc "github.com/priyanshujain/openbotkit/source/finance"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	historysrc "github.com/priyanshujain/openbotkit/source/history"
 	imsrc "github.com/priyanshujain/openbotkit/source/imessage"
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
+	wssrc "github.com/priyanshujain/openbotkit/source/websearch"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
 )
@@ -61,6 +63,12 @@ var statusCmd = &cobra.Command{
 
 		im := imsrc.New(imsrc.Config{})
 		source.Register(im)
+
+		fin := finsrc.New(finsrc.Config{})
+		source.Register(fin)
+
+		ws := wssrc.New(wssrc.Config{WebSearch: cfg.WebSearch})
+		source.Register(ws)
 
 		ctx := context.Background()
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -114,6 +122,15 @@ var statusCmd = &cobra.Command{
 				})
 				if db != nil {
 					imsrc.Migrate(db)
+				}
+			case "websearch":
+				dsn := cfg.WebSearchDataDSN()
+				db, _ = store.Open(store.Config{
+					Driver: cfg.WebSearch.Storage.Driver,
+					DSN:    dsn,
+				})
+				if db != nil {
+					wssrc.Migrate(db)
 				}
 			}
 
