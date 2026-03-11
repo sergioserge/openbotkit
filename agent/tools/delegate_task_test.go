@@ -60,7 +60,7 @@ func setupDelegateTest(t *testing.T, approveAll bool) (*DelegateTaskTool, *mockI
 	t.Helper()
 	inter := &mockInteractor{approveAll: approveAll}
 	runner := &mockAgentRunner{output: "research result"}
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,
@@ -164,8 +164,8 @@ func TestDelegateTask_ExplicitAgent(t *testing.T) {
 	claudeRunner := &mockAgentRunner{output: "claude output"}
 	geminiRunner := &mockAgentRunner{output: "gemini output"}
 	agents := []AgentInfo{
-		{Kind: AgentClaude, Binary: "/usr/local/bin/claude"},
-		{Kind: AgentGemini, Binary: "/usr/local/bin/gemini"},
+		{Kind: AgentClaude, Binary: "claude"},
+		{Kind: AgentGemini, Binary: "gemini"},
 	}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
@@ -271,7 +271,7 @@ func setupAsyncDelegateTest(t *testing.T, approveAll bool) (*DelegateTaskTool, *
 	inter := newSyncMockInteractor(approveAll)
 	runner := newBlockingRunner("async result", nil)
 	tracker := NewTaskTracker()
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,
@@ -357,7 +357,7 @@ func TestDelegateTask_AsyncFailed(t *testing.T) {
 	inter := newSyncMockInteractor(true)
 	runner := newBlockingRunner("", errors.New("agent crashed"))
 	tracker := NewTaskTracker()
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,
@@ -406,7 +406,7 @@ func TestDelegateTask_AsyncFailed(t *testing.T) {
 func TestDelegateTask_AsyncMaxConcurrent(t *testing.T) {
 	inter := newSyncMockInteractor(true)
 	tracker := NewTaskTracker()
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 
 	// Pre-fill tracker to max.
 	tracker.Start("t1", "task1", AgentClaude)
@@ -453,7 +453,7 @@ func TestDelegateTask_SyncIgnoresTracker(t *testing.T) {
 	inter := &mockInteractor{approveAll: true}
 	runner := &mockAgentRunner{output: "sync result"}
 	tracker := NewTaskTracker()
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,
@@ -514,7 +514,7 @@ func TestDelegateTask_BuildPromptFull(t *testing.T) {
 }
 
 func TestDelegateTask_MaxBudget(t *testing.T) {
-	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "/usr/local/bin/claude"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "claude"})
 	args := r.buildArgs(runOptions{maxBudgetUSD: 0.50})
 	found := false
 	for i, a := range args {
@@ -550,7 +550,7 @@ func (m *mockStreamRunner) RunStream(_ context.Context, _ string, _ time.Duratio
 func TestDelegateTask_AsyncStreamingCompleted(t *testing.T) {
 	inter := newSyncMockInteractor(true)
 	tracker := NewTaskTracker()
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,
@@ -609,7 +609,7 @@ done:
 func TestDelegateTask_AsyncStreamingFailed(t *testing.T) {
 	inter := newSyncMockInteractor(true)
 	tracker := NewTaskTracker()
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,
@@ -646,7 +646,7 @@ func TestDelegateTask_AsyncStreamingFailed(t *testing.T) {
 func TestDelegateTask_ProgressThrottling(t *testing.T) {
 	inter := newSyncMockInteractor(true)
 	tracker := NewTaskTracker()
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,
@@ -692,7 +692,7 @@ func TestDelegateTask_ProgressThrottling(t *testing.T) {
 func TestDelegateTask_ProgressIgnoresToolUseEvents(t *testing.T) {
 	inter := newSyncMockInteractor(true)
 	tracker := NewTaskTracker()
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,
@@ -751,7 +751,7 @@ func TestDelegateTask_AsyncTrackerStartError(t *testing.T) {
 	tracker.Start("t1", "task1", AgentClaude)
 	tracker.Start("t2", "task2", AgentClaude)
 	tracker.Start("t3", "task3", AgentClaude)
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,
@@ -777,7 +777,7 @@ func TestDelegateTask_AsyncTrackerStartError(t *testing.T) {
 func TestDelegateTask_AsyncDenied(t *testing.T) {
 	inter := newSyncMockInteractor(false)
 	tracker := NewTaskTracker()
-	agents := []AgentInfo{{Kind: AgentClaude, Binary: "/usr/local/bin/claude"}}
+	agents := []AgentInfo{{Kind: AgentClaude, Binary: "claude"}}
 	tool := NewDelegateTaskTool(DelegateTaskConfig{
 		Interactor: inter,
 		Agents:     agents,

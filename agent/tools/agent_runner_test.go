@@ -82,7 +82,7 @@ func TestDetectAgents_Priority(t *testing.T) {
 }
 
 func TestAgentRunner_BuildsClaudeArgs(t *testing.T) {
-	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "/usr/local/bin/claude"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "claude"})
 	args := r.buildArgs(runOptions{})
 	want := []string{"--print", "--output-format", "text"}
 	if len(args) != len(want) {
@@ -96,7 +96,7 @@ func TestAgentRunner_BuildsClaudeArgs(t *testing.T) {
 }
 
 func TestAgentRunner_BuildsGeminiArgs(t *testing.T) {
-	r := NewAgentRunner(AgentInfo{Kind: AgentGemini, Binary: "/usr/local/bin/gemini"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentGemini, Binary: "gemini"})
 	args := r.buildArgs(runOptions{})
 	want := []string{"-p"}
 	if len(args) != len(want) {
@@ -107,9 +107,21 @@ func TestAgentRunner_BuildsGeminiArgs(t *testing.T) {
 	}
 }
 
+func TestAgentRunner_BuildsCodexArgs(t *testing.T) {
+	r := NewAgentRunner(AgentInfo{Kind: AgentCodex, Binary: "codex"})
+	args := r.buildArgs(runOptions{})
+	want := []string{"exec"}
+	if len(args) != len(want) {
+		t.Fatalf("args = %v, want %v", args, want)
+	}
+	if args[0] != "exec" {
+		t.Errorf("args[0] = %q, want %q", args[0], "exec")
+	}
+}
+
 func TestAgentRunner_StripsCLAUDECODE(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
-	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "/usr/local/bin/claude"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "claude"})
 	env := r.buildEnv()
 	for _, e := range env {
 		if e == "CLAUDECODE=1" {
@@ -120,7 +132,7 @@ func TestAgentRunner_StripsCLAUDECODE(t *testing.T) {
 
 func TestAgentRunner_GeminiKeepsCLAUDECODE(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
-	r := NewAgentRunner(AgentInfo{Kind: AgentGemini, Binary: "/usr/local/bin/gemini"})
+	r := NewAgentRunner(AgentInfo{Kind: AgentGemini, Binary: "gemini"})
 	env := r.buildEnv()
 	found := false
 	for _, e := range env {
@@ -131,6 +143,22 @@ func TestAgentRunner_GeminiKeepsCLAUDECODE(t *testing.T) {
 	}
 	if !found {
 		t.Error("CLAUDECODE should NOT be stripped for gemini")
+	}
+}
+
+func TestAgentRunner_CodexKeepsCLAUDECODE(t *testing.T) {
+	t.Setenv("CLAUDECODE", "1")
+	r := NewAgentRunner(AgentInfo{Kind: AgentCodex, Binary: "codex"})
+	env := r.buildEnv()
+	found := false
+	for _, e := range env {
+		if e == "CLAUDECODE=1" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("CLAUDECODE should NOT be stripped for codex")
 	}
 }
 
@@ -194,6 +222,31 @@ func TestAgentRunner_RealGemini(t *testing.T) {
 	if err != nil {
 		if strings.Contains(err.Error(), "Permission") || strings.Contains(err.Error(), "denied") || strings.Contains(err.Error(), "auth") {
 			t.Skipf("gemini auth not configured: %v", err)
+		}
+		t.Fatalf("Run: %v", err)
+	}
+	if out == "" {
+		t.Error("expected non-empty output")
+	}
+}
+
+func TestAgentRunner_RealCodex(t *testing.T) {
+	if _, err := exec.LookPath("codex"); err != nil {
+		t.Skip("codex not on PATH")
+	}
+	agents := DetectAgents()
+	var info AgentInfo
+	for _, a := range agents {
+		if a.Kind == AgentCodex {
+			info = a
+			break
+		}
+	}
+	r := NewAgentRunner(info)
+	out, err := r.Run(context.Background(), "Say hello in exactly one word.", 30*time.Second)
+	if err != nil {
+		if strings.Contains(err.Error(), "auth") || strings.Contains(err.Error(), "API key") || strings.Contains(err.Error(), "login") {
+			t.Skipf("codex auth not configured: %v", err)
 		}
 		t.Fatalf("Run: %v", err)
 	}
