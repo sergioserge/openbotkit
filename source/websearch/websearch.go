@@ -14,6 +14,7 @@ type WebSearch struct {
 	cfg      Config
 	db       *store.DB
 	health   *healthTracker
+	client   *httpclient.Client
 	skipSSRF bool // for testing only
 }
 
@@ -30,6 +31,7 @@ func New(cfg Config, opts ...Option) *WebSearch {
 	for _, opt := range opts {
 		opt(w)
 	}
+	w.client = w.buildHTTPClient()
 	return w
 }
 
@@ -68,6 +70,10 @@ func (w *WebSearch) configuredBackends() []string {
 }
 
 func (w *WebSearch) httpClient() *httpclient.Client {
+	return w.client
+}
+
+func (w *WebSearch) buildHTTPClient() *httpclient.Client {
 	var browserOpts []browser.ClientOption
 
 	if w.cfg.WebSearch != nil {
