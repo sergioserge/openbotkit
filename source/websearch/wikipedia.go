@@ -53,8 +53,9 @@ func (w *Wikipedia) Search(ctx context.Context, query string, opts SearchOptions
 	}
 
 	snippet := extract
-	if len(snippet) > wikiMaxSnippet {
-		snippet = snippet[:wikiMaxSnippet] + "..."
+	runes := []rune(snippet)
+	if len(runes) > wikiMaxSnippet {
+		snippet = string(runes[:wikiMaxSnippet]) + "..."
 	}
 
 	return []Result{{

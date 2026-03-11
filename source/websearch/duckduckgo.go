@@ -30,7 +30,7 @@ func (d *DuckDuckGo) Priority() int { return 1 }
 
 func (d *DuckDuckGo) Search(ctx context.Context, query string, opts SearchOptions) ([]Result, error) {
 	if len(query) > maxQueryLen {
-		query = query[:maxQueryLen]
+		query = string([]rune(query)[:maxQueryLen])
 	}
 
 	form := url.Values{}

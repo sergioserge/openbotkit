@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -121,6 +122,31 @@ func TestDDGSearchQueryTruncation(t *testing.T) {
 	}
 	if !strings.Contains(received, strings.Repeat("a", 499)) {
 		t.Error("query should be truncated to 499 chars")
+	}
+}
+
+func TestDDGSearchQueryTruncationUTF8(t *testing.T) {
+	var received string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		received = string(body)
+		fmt.Fprint(w, `<html><body></body></html>`)
+	}))
+	defer srv.Close()
+
+	// 600 multi-byte runes — truncation must not split a rune.
+	multiByteQuery := strings.Repeat("日", 600)
+	d := &DuckDuckGo{client: srv.Client(), baseURL: srv.URL}
+	_, _ = d.Search(context.Background(), multiByteQuery, SearchOptions{})
+
+	// Parse the form body and check the query value.
+	vals, err := url.ParseQuery(received)
+	if err != nil {
+		t.Fatalf("invalid form body: %v", err)
+	}
+	runes := []rune(vals.Get("q"))
+	if len(runes) > maxQueryLen {
+		t.Errorf("query runes not truncated: got %d runes", len(runes))
 	}
 }
 
