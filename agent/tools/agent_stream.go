@@ -160,7 +160,14 @@ func parseStreamLine(line []byte) StreamEvent {
 		return StreamEvent{Type: "text", Content: sj.Item.Text}
 	}
 
-	// Claude/Gemini: {"type":"text"|"result", "content":"...", "result":"..."}
+	// Drop non-text Gemini/Codex protocol events (user messages, reasoning, etc.)
+	if sj.Type == "message" || sj.Type == "item.completed" ||
+		sj.Type == "init" || sj.Type == "thread.started" ||
+		sj.Type == "turn.started" || sj.Type == "turn.completed" {
+		return StreamEvent{}
+	}
+
+	// Claude: {"type":"text"|"result"|"tool_use", "content":"...", "result":"..."}
 	content := sj.Content
 	if content == "" {
 		content = sj.Result

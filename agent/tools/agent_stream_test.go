@@ -68,8 +68,8 @@ func TestParseStreamLine_GeminiResult(t *testing.T) {
 func TestParseStreamLine_GeminiUserMessage(t *testing.T) {
 	line := []byte(`{"type":"message","role":"user","content":"prompt"}`)
 	evt := parseStreamLine(line)
-	if evt.Type == "text" {
-		t.Error("user messages should not be parsed as text events")
+	if evt.Type != "" {
+		t.Errorf("user messages should be dropped, got Type=%q", evt.Type)
 	}
 }
 
@@ -87,8 +87,24 @@ func TestParseStreamLine_CodexItemCompleted(t *testing.T) {
 func TestParseStreamLine_CodexReasoningIgnored(t *testing.T) {
 	line := []byte(`{"type":"item.completed","item":{"type":"reasoning","text":"thinking..."}}`)
 	evt := parseStreamLine(line)
-	if evt.Type == "text" {
-		t.Error("reasoning items should not be parsed as text events")
+	if evt.Type != "" {
+		t.Errorf("reasoning items should be dropped, got Type=%q", evt.Type)
+	}
+}
+
+func TestParseStreamLine_CodexTurnCompleted(t *testing.T) {
+	line := []byte(`{"type":"turn.completed","usage":{"input_tokens":100}}`)
+	evt := parseStreamLine(line)
+	if evt.Type != "" {
+		t.Errorf("turn.completed should be dropped, got Type=%q", evt.Type)
+	}
+}
+
+func TestParseStreamLine_GeminiInit(t *testing.T) {
+	line := []byte(`{"type":"init","session_id":"abc"}`)
+	evt := parseStreamLine(line)
+	if evt.Type != "" {
+		t.Errorf("init should be dropped, got Type=%q", evt.Type)
 	}
 }
 

@@ -146,6 +146,22 @@ func TestAgentRunner_GeminiKeepsCLAUDECODE(t *testing.T) {
 	}
 }
 
+func TestAgentRunner_CodexKeepsCLAUDECODE(t *testing.T) {
+	t.Setenv("CLAUDECODE", "1")
+	r := NewAgentRunner(AgentInfo{Kind: AgentCodex, Binary: "codex"})
+	env := r.buildEnv()
+	found := false
+	for _, e := range env {
+		if e == "CLAUDECODE=1" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("CLAUDECODE should NOT be stripped for codex")
+	}
+}
+
 func TestAgentRunner_Timeout(t *testing.T) {
 	r := NewAgentRunner(AgentInfo{Kind: AgentClaude, Binary: "sleep"})
 	_, err := r.Run(context.Background(), "", 100*time.Millisecond)
