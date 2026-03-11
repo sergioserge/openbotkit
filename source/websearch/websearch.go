@@ -15,6 +15,7 @@ const chromeUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWe
 type WebSearch struct {
 	cfg      Config
 	db       *store.DB
+	health   *healthTracker
 	skipSSRF bool // for testing only
 }
 
@@ -27,7 +28,7 @@ func WithDB(db *store.DB) Option {
 }
 
 func New(cfg Config, opts ...Option) *WebSearch {
-	w := &WebSearch{cfg: cfg}
+	w := &WebSearch{cfg: cfg, health: newHealthTracker()}
 	for _, opt := range opts {
 		opt(w)
 	}

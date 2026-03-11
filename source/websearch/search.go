@@ -73,12 +73,18 @@ func (w *WebSearch) searchWithEngines(ctx context.Context, query string, opts Se
 	var lastErr error
 
 	for _, eng := range engines {
+		if !w.health.IsHealthy(eng.Name()) {
+			slog.Info("skipping unhealthy backend", "engine", eng.Name())
+			continue
+		}
 		results, err := eng.Search(ctx, query, opts)
 		if err != nil {
 			lastErr = err
+			w.health.RecordFailure(eng.Name())
 			slog.Warn("search engine failed", "engine", eng.Name(), "error", err)
 			continue
 		}
+		w.health.RecordSuccess(eng.Name())
 		allResults = append(allResults, results...)
 		backends = append(backends, eng.Name())
 	}
@@ -189,12 +195,18 @@ func (w *WebSearch) newsWithEngines(ctx context.Context, query string, opts Sear
 	var lastErr error
 
 	for _, eng := range engines {
+		if !w.health.IsHealthy(eng.Name()) {
+			slog.Info("skipping unhealthy news backend", "engine", eng.Name())
+			continue
+		}
 		results, err := eng.News(ctx, query, opts)
 		if err != nil {
 			lastErr = err
+			w.health.RecordFailure(eng.Name())
 			slog.Warn("news engine failed", "engine", eng.Name(), "error", err)
 			continue
 		}
+		w.health.RecordSuccess(eng.Name())
 		allResults = append(allResults, results...)
 		backends = append(backends, eng.Name())
 	}
