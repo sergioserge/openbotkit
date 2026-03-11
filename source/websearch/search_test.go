@@ -216,6 +216,25 @@ func TestSearchBackendFiltering(t *testing.T) {
 	})
 }
 
+func TestNewsBackendFiltering(t *testing.T) {
+	t.Run("configured backends filters auto set", func(t *testing.T) {
+		engines := buildNewsEngines(nil, "auto", []string{"duckduckgo"})
+		if len(engines) != 1 {
+			t.Fatalf("expected 1 engine, got %d", len(engines))
+		}
+		if engines[0].Name() != "duckduckgo" {
+			t.Errorf("expected duckduckgo, got %q", engines[0].Name())
+		}
+	})
+
+	t.Run("empty configured uses all", func(t *testing.T) {
+		engines := buildNewsEngines(nil, "auto", nil)
+		if len(engines) != 2 {
+			t.Errorf("expected 2 engines for auto with nil configured, got %d", len(engines))
+		}
+	})
+}
+
 func TestSearchDefaultOptions(t *testing.T) {
 	engines := []Engine{
 		&mockEngine{name: "mock", priority: 1, results: []Result{

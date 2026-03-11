@@ -183,6 +183,22 @@ func TestPutSearchHistory(t *testing.T) {
 	}
 }
 
+func TestClearCachesExported(t *testing.T) {
+	db := openTestDB(t)
+	ws := New(Config{}, WithDB(db))
+
+	putSearchCache(db, "key1", "q", "web", []Result{{Title: "T", URL: "https://t.com"}})
+
+	if err := ws.ClearCaches(); err != nil {
+		t.Fatalf("ClearCaches: %v", err)
+	}
+
+	_, ok := getSearchCache(db, "key1", 15*time.Minute)
+	if ok {
+		t.Error("search cache should be empty after ClearCaches")
+	}
+}
+
 func TestClearAllCaches(t *testing.T) {
 	db := openTestDB(t)
 

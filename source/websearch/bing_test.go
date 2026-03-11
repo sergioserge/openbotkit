@@ -2,6 +2,7 @@ package websearch
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -68,6 +69,11 @@ func TestUnwrapBingURL(t *testing.T) {
 	}{
 		{"plain URL", "https://example.com", "https://example.com"},
 		{"non-bing redirect", "https://other.com/page", "https://other.com/page"},
+		{"bing redirect with base64 encoded URL",
+			"https://www.bing.com/ck/a?u=a1" + base64.RawURLEncoding.EncodeToString([]byte("https://decoded.example.com")),
+			"https://decoded.example.com"},
+		{"bing redirect too short u param", "https://www.bing.com/ck/a?u=ab", "https://www.bing.com/ck/a?u=ab"},
+		{"bing redirect empty u param", "https://www.bing.com/ck/a?u=", "https://www.bing.com/ck/a?u="},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
