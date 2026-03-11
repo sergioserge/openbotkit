@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/priyanshujain/openbotkit/internal/skills"
 )
@@ -22,11 +21,10 @@ func (s *Server) handleGoogleAuthCallback(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Extract account from state if embedded, otherwise use first known account.
-	account := s.resolveAccount()
-
-	// Extract scopes from state prefix (gws-<timestamp>).
-	scopes := s.scopesFromState(state)
+	scopes, account, ok := s.scopeWaiter.Lookup(state)
+	if !ok {
+		account = s.resolveAccount()
+	}
 
 	if err := s.google.ExchangeCode(r.Context(), code, account, scopes); err != nil {
 		slog.Error("google auth callback: exchange code", "error", err)
@@ -52,11 +50,4 @@ func (s *Server) resolveAccount() string {
 		return ""
 	}
 	return accounts[0]
-}
-
-func (s *Server) scopesFromState(state string) []string {
-	// State is formatted as "gws-<timestamp>" — no embedded scopes.
-	// Return nil; ExchangeCode will merge with existing.
-	_ = strings.TrimPrefix(state, "gws-")
-	return nil
 }

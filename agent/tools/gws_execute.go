@@ -133,7 +133,7 @@ func (g *GWSExecuteTool) requestConsent(ctx context.Context, scopes []string) er
 	g.interactor.Notify("I need additional Google access to complete this request.")
 	g.interactor.NotifyLink("Tap to grant access", url)
 
-	if err := g.scopeWaiter.Wait(state, g.authTimeout); err != nil {
+	if err := g.scopeWaiter.Wait(state, g.authTimeout, scopes, g.account); err != nil {
 		return fmt.Errorf("auth: %w", err)
 	}
 	g.interactor.Notify("Access granted, thanks!")

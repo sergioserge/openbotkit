@@ -92,14 +92,6 @@ func TestResolveAccount_NoAccounts(t *testing.T) {
 	}
 }
 
-func TestScopesFromState(t *testing.T) {
-	s := &Server{}
-	scopes := s.scopesFromState("gws-123456")
-	if scopes != nil {
-		t.Errorf("scopesFromState = %v, want nil", scopes)
-	}
-}
-
 const testCredsJSON = `{
 	"installed": {
 		"client_id": "test.apps.googleusercontent.com",
@@ -143,7 +135,7 @@ func TestHandleGoogleAuthCallback_SignalsWaiter(t *testing.T) {
 	// For a proper signal test, we verify the waiter is called via a goroutine.
 	signaled := make(chan error, 1)
 	go func() {
-		signaled <- waiter.Wait("test-state", 2*time.Second)
+		signaled <- waiter.Wait("test-state", 2*time.Second, []string{"calendar"}, "user@test.com")
 	}()
 
 	// Give the wait goroutine time to register.
