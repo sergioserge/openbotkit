@@ -130,7 +130,7 @@ func runUsageQuery(groupBy string) error {
 			formatTokens(r.CacheReadTokens), formatTokens(r.CacheWriteTokens),
 			r.CallCount, cost)
 	}
-	fmt.Fprintf(w, "\t\t\t\t\t\t\t$%.2f\n", totalCost)
+	fmt.Fprintf(w, "TOTAL\t\t\t\t\t\t\t$%.2f\n", totalCost)
 	w.Flush()
 
 	return nil
