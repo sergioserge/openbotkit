@@ -80,6 +80,9 @@ var chatCmd = &cobra.Command{
 			System:      "You are a focused sub-agent. Complete the given task and return a concise result.",
 		}))
 
+		// Register delegate_task if external AI CLIs are available.
+		registerDelegateTool(toolReg, ch)
+
 		// Register Slack tools if configured.
 		registerSlackTools(cfg, toolReg, ch)
 
@@ -213,6 +216,18 @@ func registerSlackTools(cfg *config.Config, reg *tools.Registry, ch *clicli.Chan
 	reg.Register(tools.NewSlackSendTool(deps))
 	reg.Register(tools.NewSlackEditTool(deps))
 	reg.Register(tools.NewSlackReactTool(deps))
+}
+
+func registerDelegateTool(reg *tools.Registry, ch *clicli.Channel) {
+	agents := tools.DetectAgents()
+	if len(agents) == 0 {
+		return
+	}
+	inter := &cliInteractor{ch: ch}
+	reg.Register(tools.NewDelegateTaskTool(tools.DelegateTaskConfig{
+		Interactor: inter,
+		Agents:     agents,
+	}))
 }
 
 func init() {

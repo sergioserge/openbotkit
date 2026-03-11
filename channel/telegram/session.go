@@ -234,6 +234,7 @@ func (sm *SessionManager) newAgent() (*agent.Agent, *usagesrc.Recorder, error) {
 	}
 
 	sm.registerSlackTools(toolReg)
+	sm.registerDelegateTool(toolReg)
 
 	toolReg.Register(tools.NewSubagentTool(tools.SubagentConfig{
 		Provider:    sm.provider,
@@ -252,6 +253,17 @@ func (sm *SessionManager) newAgent() (*agent.Agent, *usagesrc.Recorder, error) {
 		opts = append(opts, agent.WithUsageRecorder(recorder))
 	}
 	return agent.New(sm.provider, sm.model, toolReg, opts...), recorder, nil
+}
+
+func (sm *SessionManager) registerDelegateTool(reg *tools.Registry) {
+	agents := tools.DetectAgents()
+	if len(agents) == 0 || sm.interactor == nil {
+		return
+	}
+	reg.Register(tools.NewDelegateTaskTool(tools.DelegateTaskConfig{
+		Interactor: sm.interactor,
+		Agents:     agents,
+	}))
 }
 
 func (sm *SessionManager) registerSlackTools(reg *tools.Registry) {
