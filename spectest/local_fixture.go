@@ -178,7 +178,7 @@ func createMemoryDB(t *testing.T, dir string) {
 func installSkills(t *testing.T, dir string) {
 	t.Helper()
 	skillsDir := filepath.Join(dir, "skills")
-	for _, name := range []string{"email-read", "whatsapp-read", "memory-save"} {
+	for _, name := range []string{"email-read", "whatsapp-read", "memory-read", "memory-save"} {
 		destDir := filepath.Join(skillsDir, name)
 		if err := os.MkdirAll(destDir, 0700); err != nil {
 			t.Fatalf("mkdir skill %s: %v", name, err)
