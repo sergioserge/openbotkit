@@ -10,4 +10,5 @@ var Cmd = &cobra.Command{
 func init() {
 	Cmd.AddCommand(searchCmd)
 	Cmd.AddCommand(fetchCmd)
+	Cmd.AddCommand(newsCmd)
 }
