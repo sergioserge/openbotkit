@@ -39,6 +39,8 @@ type SessionManager struct {
 	account     string
 	manifest    *skills.Manifest
 
+	taskTracker *tools.TaskTracker
+
 	mu        sync.Mutex
 	sessionID string
 	timer     *time.Timer
@@ -61,6 +63,7 @@ func NewSessionManager(cfg *config.Config, ch *Channel, p provider.Provider, pro
 		provider:     p,
 		providerName: providerName,
 		model:        model,
+		taskTracker:  tools.NewTaskTracker(),
 	}
 	if len(deps) > 0 {
 		d := deps[0]
@@ -260,13 +263,12 @@ func (sm *SessionManager) registerDelegateTool(reg *tools.Registry) {
 	if len(agents) == 0 || sm.interactor == nil {
 		return
 	}
-	tracker := tools.NewTaskTracker()
 	reg.Register(tools.NewDelegateTaskTool(tools.DelegateTaskConfig{
 		Interactor: sm.interactor,
 		Agents:     agents,
-		Tracker:    tracker,
+		Tracker:    sm.taskTracker,
 	}))
-	reg.Register(tools.NewCheckTaskTool(tracker))
+	reg.Register(tools.NewCheckTaskTool(sm.taskTracker))
 }
 
 func (sm *SessionManager) registerSlackTools(reg *tools.Registry) {
