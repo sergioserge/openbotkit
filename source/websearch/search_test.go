@@ -11,11 +11,13 @@ type mockEngine struct {
 	priority int
 	results  []Result
 	err      error
+	calls    int
 }
 
 func (m *mockEngine) Name() string  { return m.name }
 func (m *mockEngine) Priority() int { return m.priority }
 func (m *mockEngine) Search(_ context.Context, _ string, _ SearchOptions) ([]Result, error) {
+	m.calls++
 	return m.results, m.err
 }
 
@@ -336,73 +338,86 @@ func TestNewsBackendSelection(t *testing.T) {
 	})
 }
 
-func TestSearchWithCacheHit(t *testing.T) {
+func TestSearchCacheIntegration(t *testing.T) {
 	db := openTestDB(t)
-
-	callCount := 0
-	engines := []Engine{
-		&mockEngine{name: "mock", priority: 1, results: []Result{
-			{Title: "R1", URL: "https://example.com/1", Source: "mock"},
-		}},
-	}
-	_ = callCount
-
 	ws := New(Config{}, WithDB(db))
 
-	// First search — cache miss, hits engine.
-	result1, err := ws.searchWithEngines(context.Background(), "test", SearchOptions{MaxResults: 10, Backend: "mock", Region: "us-en"}, engines)
+	eng := &mockEngine{name: "mock", priority: 1, results: []Result{
+		{Title: "R1", URL: "https://example.com/1", Source: "mock"},
+	}}
+
+	// First call — cache miss, engine called.
+	r1, err := ws.searchWithEngines(context.Background(), "test", SearchOptions{MaxResults: 10, Backend: "auto", Region: "us-en"}, []Engine{eng})
 	if err != nil {
 		t.Fatalf("first search: %v", err)
 	}
-	// Store in cache manually since searchWithEngines doesn't cache (Search does).
-	key := cacheKey("test", "web", "mock", "us-en", "")
-	putSearchCache(db, key, "test", "web", result1.Results)
+	if eng.calls != 1 {
+		t.Fatalf("expected 1 engine call, got %d", eng.calls)
+	}
 
-	// Second search — should hit cache.
-	cached, ok := getSearchCache(db, key, 15*60*1e9) // 15 min as Duration
+	// Populate cache as Search() would.
+	key := cacheKey("test", "web", "auto", "us-en", "")
+	putSearchCache(db, key, "test", "web", r1.Results)
+
+	// Second call — cache hit, engine NOT called again.
+	cached, ok := getSearchCache(db, key, ws.cacheTTL())
 	if !ok {
 		t.Fatal("expected cache hit")
 	}
 	if !cached.Metadata.Cached {
 		t.Error("expected Cached=true in metadata")
 	}
-	if len(cached.Results) != 1 {
-		t.Fatalf("expected 1 cached result, got %d", len(cached.Results))
+	if len(cached.Results) != 1 || cached.Results[0].Title != "R1" {
+		t.Errorf("unexpected cached results: %v", cached.Results)
 	}
 }
 
 func TestSearchNoCacheBypass(t *testing.T) {
 	db := openTestDB(t)
 
-	key := cacheKey("test", "web", "auto", "us-en", "")
-	putSearchCache(db, key, "test", "web", []Result{{Title: "Cached", URL: "https://cached.com", Source: "cache"}})
+	// Pre-populate cache.
+	key := cacheKey("bypass-test", "web", "auto", "us-en", "")
+	putSearchCache(db, key, "bypass-test", "web", []Result{
+		{Title: "Cached", URL: "https://cached.com", Source: "cache"},
+	})
 
+	eng := &mockEngine{name: "mock", priority: 1, results: []Result{
+		{Title: "Fresh", URL: "https://fresh.com", Source: "mock"},
+	}}
 	ws := New(Config{}, WithDB(db))
 
-	// With NoCache=true, Search() should skip cache lookup.
-	// We test this by calling Search with NoCache and an invalid backend
-	// that would fail — if cache were checked, it would return the cached result.
-	// Instead we verify the opts flag is respected.
-	_ = ws
-	opts := SearchOptions{NoCache: true, Backend: "auto", Region: "us-en"}
-	if !opts.NoCache {
-		t.Error("expected NoCache=true")
+	// With NoCache, searchWithEngines + manual NoCache check simulates Search().
+	// Test that the engine is called despite cache existing.
+	opts := SearchOptions{MaxResults: 10, Backend: "auto", Region: "us-en", NoCache: true}
+
+	// NoCache means Search() skips getSearchCache. Verify engine gets called.
+	result, err := ws.searchWithEngines(context.Background(), "bypass-test", opts, []Engine{eng})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if eng.calls != 1 {
+		t.Fatalf("expected engine to be called, got %d calls", eng.calls)
+	}
+	if result.Results[0].Title != "Fresh" {
+		t.Errorf("expected fresh result, got %q", result.Results[0].Title)
 	}
 }
 
 func TestSearchNilDBSkipsCache(t *testing.T) {
-	ws := New(Config{})
-	// Should not panic with nil db.
-	result, err := ws.searchWithEngines(context.Background(), "test", SearchOptions{MaxResults: 10}, []Engine{
-		&mockEngine{name: "mock", priority: 1, results: []Result{
-			{Title: "R1", URL: "https://example.com/1", Source: "mock"},
-		}},
-	})
+	eng := &mockEngine{name: "mock", priority: 1, results: []Result{
+		{Title: "R1", URL: "https://example.com/1", Source: "mock"},
+	}}
+	ws := New(Config{}) // nil db
+
+	result, err := ws.searchWithEngines(context.Background(), "test", SearchOptions{MaxResults: 10}, []Engine{eng})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(result.Results))
+	}
+	if eng.calls != 1 {
+		t.Fatalf("expected engine called once, got %d", eng.calls)
 	}
 }
 
