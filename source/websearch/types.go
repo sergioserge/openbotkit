@@ -25,6 +25,7 @@ type SearchMetadata struct {
 	Backends     []string `json:"backends"`
 	SearchTimeMs int64    `json:"search_time_ms"`
 	TotalResults int      `json:"total_results"`
+	Cached       bool     `json:"cached"`
 }
 
 type FetchResult struct {
@@ -34,6 +35,7 @@ type FetchResult struct {
 	ContentType string `json:"content_type"`
 	StatusCode  int    `json:"status_code"`
 	Truncated   bool   `json:"truncated"`
+	Cached      bool   `json:"cached"`
 }
 
 type SearchOptions struct {
@@ -41,9 +43,11 @@ type SearchOptions struct {
 	Backend    string
 	TimeLimit  string
 	Region     string
+	NoCache    bool
 }
 
 type FetchOptions struct {
 	Format    string
 	MaxLength int
+	NoCache   bool
 }
