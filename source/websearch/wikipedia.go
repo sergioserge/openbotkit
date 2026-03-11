@@ -13,6 +13,7 @@ import (
 const (
 	wikiOpenSearchURL = "https://en.wikipedia.org/w/api.php"
 	wikiMaxSnippet    = 300
+	wikiUserAgent     = "openbotkit/0.1 (https://github.com/priyanshujain/openbotkit)"
 )
 
 type Wikipedia struct {
@@ -77,6 +78,7 @@ func (w *Wikipedia) openSearch(ctx context.Context, query string) (title, pageUR
 	if err != nil {
 		return "", "", err
 	}
+	req.Header.Set("User-Agent", wikiUserAgent)
 
 	resp, err := w.client.Do(req)
 	if err != nil {
@@ -126,6 +128,7 @@ func (w *Wikipedia) getExtract(ctx context.Context, title string) (string, error
 	if err != nil {
 		return "", err
 	}
+	req.Header.Set("User-Agent", wikiUserAgent)
 
 	resp, err := w.client.Do(req)
 	if err != nil {
