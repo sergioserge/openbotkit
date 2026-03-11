@@ -166,11 +166,13 @@ func estimateCost(r usagesrc.AggregatedUsage) float64 {
 	pricing, ok := modelPricing[r.Model]
 	if !ok {
 		// Try prefix matching for versioned model names.
+		// Use longest match to avoid "gpt-4o" matching "gpt-4o-mini-*".
+		bestLen := 0
 		for prefix, p := range modelPricing {
-			if len(r.Model) >= len(prefix) && r.Model[:len(prefix)] == prefix {
+			if len(prefix) > bestLen && len(r.Model) >= len(prefix) && r.Model[:len(prefix)] == prefix {
 				pricing = p
+				bestLen = len(prefix)
 				ok = true
-				break
 			}
 		}
 	}

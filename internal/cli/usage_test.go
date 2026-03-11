@@ -62,6 +62,20 @@ func TestEstimateCost_UnknownModel(t *testing.T) {
 	}
 }
 
+func TestEstimateCost_PrefixMatchLongestWins(t *testing.T) {
+	// "gpt-4o-mini-2025" should match "gpt-4o-mini" pricing, not "gpt-4o".
+	r := usagesrc.AggregatedUsage{
+		Model:        "gpt-4o-mini-2025-01-01",
+		InputTokens:  1_000_000,
+		OutputTokens: 0,
+	}
+	cost := estimateCost(r)
+	// gpt-4o-mini input rate = $0.15/M → cost should be $0.15
+	if cost != 0.15 {
+		t.Errorf("expected $0.15 (gpt-4o-mini rate), got $%.2f", cost)
+	}
+}
+
 func TestEstimateCost_OpenAI(t *testing.T) {
 	r := usagesrc.AggregatedUsage{
 		Model:           "gpt-4o",
