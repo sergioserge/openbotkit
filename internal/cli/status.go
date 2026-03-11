@@ -10,6 +10,7 @@ import (
 	"github.com/priyanshujain/openbotkit/oauth/google"
 	"github.com/priyanshujain/openbotkit/source"
 	ansrc "github.com/priyanshujain/openbotkit/source/applenotes"
+	finsrc "github.com/priyanshujain/openbotkit/source/finance"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	historysrc "github.com/priyanshujain/openbotkit/source/history"
 	imsrc "github.com/priyanshujain/openbotkit/source/imessage"
@@ -61,6 +62,9 @@ var statusCmd = &cobra.Command{
 
 		im := imsrc.New(imsrc.Config{})
 		source.Register(im)
+
+		fin := finsrc.New(finsrc.Config{})
+		source.Register(fin)
 
 		ctx := context.Background()
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
