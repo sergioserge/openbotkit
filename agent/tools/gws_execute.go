@@ -110,7 +110,7 @@ func (g *GWSExecuteTool) Execute(ctx context.Context, input json.RawMessage) (st
 
 	// Write approval.
 	if isWrite {
-		return GuardedWrite(ctx, g.interactor, fmt.Sprintf("Run gws command: %s", in.Command), func() (string, error) {
+		return GuardedAction(ctx, g.interactor, RiskHigh, fmt.Sprintf("Run gws command: %s", in.Command), func() (string, error) {
 			return g.run(ctx, args)
 		})
 	}
