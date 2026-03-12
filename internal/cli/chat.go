@@ -16,6 +16,7 @@ import (
 	historysrc "github.com/priyanshujain/openbotkit/source/history"
 	slacksrc "github.com/priyanshujain/openbotkit/source/slack"
 	usagesrc "github.com/priyanshujain/openbotkit/source/usage"
+	wssrc "github.com/priyanshujain/openbotkit/source/websearch"
 	"github.com/priyanshujain/openbotkit/store"
 
 	// Register provider factories.
@@ -44,8 +45,6 @@ var chatCmd = &cobra.Command{
 			return fmt.Errorf("create provider registry: %w", err)
 		}
 
-		router := provider.NewRouter(registry, cfg.Models)
-
 		// Resolve the default model's provider and model name.
 		providerName, modelName, err := provider.ParseModelSpec(cfg.Models.Default)
 		if err != nil {
@@ -55,8 +54,6 @@ var chatCmd = &cobra.Command{
 		if !ok {
 			return fmt.Errorf("provider %q not found", providerName)
 		}
-
-		_ = router // Will be used for tier-based routing later.
 
 		sessionID := generateSessionID()
 
@@ -94,6 +91,9 @@ var chatCmd = &cobra.Command{
 
 		// Register Slack tools if configured.
 		registerSlackTools(cfg, toolReg, ch)
+
+		// Register web search/fetch tools.
+		registerWebTools(cfg, toolReg, registry, p, modelName)
 
 		// Set up usage recording.
 		usageRecorder := openUsageRecorder(cfg, providerName, "cli", sessionID)
@@ -244,6 +244,49 @@ func registerDelegateTool(reg *tools.Registry, ch *clicli.Channel) {
 		Tracker:    tracker,
 	}))
 	reg.Register(tools.NewCheckTaskTool(tracker))
+}
+
+func registerWebTools(cfg *config.Config, reg *tools.Registry, provRegistry *provider.Registry, defaultP provider.Provider, defaultModel string) {
+	var opts []wssrc.Option
+	if err := config.EnsureSourceDir("websearch"); err == nil {
+		db, err := store.Open(store.Config{
+			Driver: cfg.WebSearch.Storage.Driver,
+			DSN:    cfg.WebSearchDataDSN(),
+		})
+		if err == nil {
+			opts = append(opts, wssrc.WithDB(db))
+		}
+	}
+
+	ws := wssrc.New(wssrc.Config{WebSearch: cfg.WebSearch}, opts...)
+
+	fastP, fastModel := resolveFastProvider(cfg, provRegistry)
+	if fastP == nil {
+		fastP = defaultP
+		fastModel = defaultModel
+	}
+	deps := tools.WebToolDeps{
+		WS:       ws,
+		Provider: fastP,
+		Model:    fastModel,
+	}
+	reg.Register(tools.NewWebSearchTool(deps))
+	reg.Register(tools.NewWebFetchTool(deps))
+}
+
+func resolveFastProvider(cfg *config.Config, reg *provider.Registry) (provider.Provider, string) {
+	if cfg.Models == nil || cfg.Models.Fast == "" {
+		return nil, ""
+	}
+	provName, model, err := provider.ParseModelSpec(cfg.Models.Fast)
+	if err != nil {
+		return nil, ""
+	}
+	p, ok := reg.Get(provName)
+	if !ok {
+		return nil, ""
+	}
+	return p, model
 }
 
 func init() {
