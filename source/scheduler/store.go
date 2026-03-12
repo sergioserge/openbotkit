@@ -77,6 +77,14 @@ func ListDueOneShot(db *store.DB, now time.Time) ([]Schedule, error) {
 	return scanSchedules(rows)
 }
 
+func Disable(db *store.DB, id int64) error {
+	_, err := db.Exec(db.Rebind("UPDATE schedules SET enabled = 0 WHERE id = ?"), id)
+	if err != nil {
+		return fmt.Errorf("disable schedule: %w", err)
+	}
+	return nil
+}
+
 func Delete(db *store.DB, id int64) error {
 	_, err := db.Exec(db.Rebind("DELETE FROM schedules WHERE id = ?"), id)
 	if err != nil {

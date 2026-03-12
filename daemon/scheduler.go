@@ -214,8 +214,8 @@ func (s *Scheduler) pollOneShot(ctx context.Context) error {
 			continue
 		}
 
-		if err := scheduler.MarkCompleted(db, sched.ID, time.Now().UTC()); err != nil {
-			slog.Error("scheduler: mark one-shot completed", "schedule_id", sched.ID, "error", err)
+		if err := scheduler.Disable(db, sched.ID); err != nil {
+			slog.Error("scheduler: disable one-shot after enqueue", "schedule_id", sched.ID, "error", err)
 		}
 
 		slog.Info("scheduler: enqueued one-shot task", "schedule_id", sched.ID)

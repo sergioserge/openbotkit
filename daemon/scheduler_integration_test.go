@@ -98,17 +98,14 @@ func TestSchedulerOneShotIntegration(t *testing.T) {
 		t.Fatalf("pollOneShot: %v", err)
 	}
 
-	// Verify the schedule was marked completed.
+	// Verify the schedule was disabled (worker marks completed later).
 	sdb, _ = store.Open(store.Config{Driver: "sqlite", DSN: schedDBPath})
 	defer sdb.Close()
 	got, err := scheduler.Get(sdb, id)
 	if err != nil {
 		t.Fatalf("get schedule: %v", err)
 	}
-	if got.CompletedAt == nil {
-		t.Fatal("expected schedule to be marked completed")
-	}
 	if got.Enabled {
-		t.Fatal("expected schedule to be disabled after completion")
+		t.Fatal("expected schedule to be disabled after enqueue")
 	}
 }
