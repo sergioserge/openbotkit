@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/priyanshujain/openbotkit/config"
 	"github.com/priyanshujain/openbotkit/provider"
 )
 
@@ -43,6 +44,21 @@ func NewStandardRegistry() *Registry {
 	r.Register(&FileReadTool{})
 	r.Register(&FileWriteTool{})
 	r.Register(&FileEditTool{})
+	r.Register(&LoadSkillsTool{})
+	r.Register(&SearchSkillsTool{})
+	return r
+}
+
+// NewScheduledTaskRegistry creates a restricted registry for unattended
+// scheduled tasks. No file_write/file_edit; bash is allowlisted to obk
+// and sqlite3 only.
+func NewScheduledTaskRegistry() *Registry {
+	r := NewRegistry()
+	r.Register(NewBashTool(30*time.Second,
+		WithCommandFilter(NewAllowlistFilter([]string{"obk", "sqlite3"})),
+		WithWorkDir(config.Dir()),
+	))
+	r.Register(&FileReadTool{})
 	r.Register(&LoadSkillsTool{})
 	r.Register(&SearchSkillsTool{})
 	return r

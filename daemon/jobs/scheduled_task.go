@@ -109,7 +109,7 @@ func (w *ScheduledTaskWorker) runAgent(ctx context.Context, task string) (string
 		return "", fmt.Errorf("provider %q not found", providerName)
 	}
 
-	toolReg := tools.NewStandardRegistry()
+	toolReg := tools.NewScheduledTaskRegistry()
 
 	identity := "You are a scheduled task agent. Execute the task and return a concise result.\n"
 	blocks := tools.BuildSystemBlocks(identity, toolReg)
