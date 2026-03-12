@@ -15,14 +15,33 @@ const defaultBashTimeout = 30 * time.Second
 // BashTool executes shell commands.
 type BashTool struct {
 	timeout time.Duration
+	filter  *CommandFilter
+	workDir string
 }
 
-// NewBashTool creates a new bash tool with the given timeout.
-func NewBashTool(timeout time.Duration) *BashTool {
+// BashOption configures a BashTool.
+type BashOption func(*BashTool)
+
+// WithCommandFilter sets a command filter on the bash tool.
+func WithCommandFilter(f *CommandFilter) BashOption {
+	return func(b *BashTool) { b.filter = f }
+}
+
+// WithWorkDir sets the working directory for command execution.
+func WithWorkDir(dir string) BashOption {
+	return func(b *BashTool) { b.workDir = dir }
+}
+
+// NewBashTool creates a new bash tool with the given timeout and options.
+func NewBashTool(timeout time.Duration, opts ...BashOption) *BashTool {
 	if timeout == 0 {
 		timeout = defaultBashTimeout
 	}
-	return &BashTool{timeout: timeout}
+	b := &BashTool{timeout: timeout}
+	for _, opt := range opts {
+		opt(b)
+	}
+	return b
 }
 
 func (b *BashTool) Name() string        { return "bash" }
@@ -57,10 +76,17 @@ func (b *BashTool) Execute(ctx context.Context, input json.RawMessage) (string, 
 		return "", fmt.Errorf("gws commands must use the gws_execute tool, not bash")
 	}
 
+	if err := b.filter.Check(in.Command); err != nil {
+		return "", fmt.Errorf("command blocked: %w", err)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, b.timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", in.Command)
+	if b.workDir != "" {
+		cmd.Dir = b.workDir
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
