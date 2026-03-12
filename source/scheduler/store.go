@@ -149,23 +149,38 @@ func scanSchedule(row scannable) (*Schedule, error) {
 	s.LastError = lastError.String
 
 	if scheduledAt.Valid {
-		t := parseTime(scheduledAt.String)
+		t, err := parseTime(scheduledAt.String)
+		if err != nil {
+			return nil, fmt.Errorf("parse scheduled_at: %w", err)
+		}
 		s.ScheduledAt = t
 	}
 	if lastRunAt.Valid {
-		s.LastRunAt = parseTime(lastRunAt.String)
+		t, err := parseTime(lastRunAt.String)
+		if err != nil {
+			return nil, fmt.Errorf("parse last_run_at: %w", err)
+		}
+		s.LastRunAt = t
 	}
 	if createdAt.Valid {
-		if t := parseTime(createdAt.String); t != nil {
-			s.CreatedAt = *t
+		t, err := parseTime(createdAt.String)
+		if err != nil {
+			return nil, fmt.Errorf("parse created_at: %w", err)
 		}
+		s.CreatedAt = *t
 	}
 	if completedAt.Valid {
-		s.CompletedAt = parseTime(completedAt.String)
+		t, err := parseTime(completedAt.String)
+		if err != nil {
+			return nil, fmt.Errorf("parse completed_at: %w", err)
+		}
+		s.CompletedAt = t
 	}
 
 	if metaJSON.Valid && metaJSON.String != "" {
-		_ = json.Unmarshal([]byte(metaJSON.String), &s.ChannelMeta)
+		if err := json.Unmarshal([]byte(metaJSON.String), &s.ChannelMeta); err != nil {
+			return nil, fmt.Errorf("unmarshal channel_meta: %w", err)
+		}
 	}
 
 	return &s, nil
@@ -183,15 +198,15 @@ func scanSchedules(rows *sql.Rows) ([]Schedule, error) {
 	return result, rows.Err()
 }
 
-func parseTime(s string) *time.Time {
+func parseTime(s string) (*time.Time, error) {
 	for _, f := range []string{
 		timeFormat,
 		"2006-01-02 15:04:05",
 		time.RFC3339,
 	} {
 		if t, err := time.Parse(f, s); err == nil {
-			return &t
+			return &t, nil
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("unrecognised time format: %q", s)
 }
