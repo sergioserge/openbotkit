@@ -114,6 +114,32 @@ func TestFilter_NilFilter(t *testing.T) {
 	}
 }
 
+func TestAllowlistFilter_EmptySegmentInPipe(t *testing.T) {
+	f := NewAllowlistFilter([]string{"obk"})
+	// "obk db ;; obk list" has an empty segment between the semicolons.
+	if err := f.Check("obk db ; ; obk list"); err != nil {
+		t.Errorf("expected pass with empty segments, got: %v", err)
+	}
+}
+
+func TestFirstToken(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"echo hello", "echo"},
+		{"  ls -la  ", "ls"},
+		{"", ""},
+		{"   ", ""},
+		{"single", "single"},
+	}
+	for _, tc := range cases {
+		if got := firstToken(tc.input); got != tc.want {
+			t.Errorf("firstToken(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
 func TestDefaultBlocklist_Coverage(t *testing.T) {
 	f := NewBlocklistFilter(DefaultBlocklist)
 	blocked := []string{"curl x", "wget x", "nc x", "ssh x", "scp x", "sudo x", "chmod x", "chown x", "eval x", "exec x", "ncat x", "nmap x"}

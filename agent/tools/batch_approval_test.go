@@ -1,6 +1,9 @@
 package tools
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 type mockBatchInteractor struct {
 	mockInteractor
@@ -48,6 +51,14 @@ func TestRequestBatchOrSequential_SequentialFallback(t *testing.T) {
 	}
 	if len(inter.approvals) != 2 {
 		t.Errorf("expected 2 sequential approvals, got %d", len(inter.approvals))
+	}
+}
+
+func TestRequestBatchOrSequential_SequentialError(t *testing.T) {
+	inter := &mockInteractor{approveErr: errors.New("disconnected")}
+	_, err := RequestBatchOrSequential(inter, []string{"a"})
+	if err == nil {
+		t.Fatal("expected error from sequential fallback")
 	}
 }
 

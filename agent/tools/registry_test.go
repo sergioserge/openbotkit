@@ -13,6 +13,32 @@ import (
 	"github.com/priyanshujain/openbotkit/store"
 )
 
+func TestNewStandardRegistry_Tools(t *testing.T) {
+	r := NewStandardRegistry()
+	want := map[string]bool{
+		"bash": true, "file_read": true, "file_write": true,
+		"file_edit": true, "load_skills": true, "search_skills": true,
+	}
+	for _, name := range r.ToolNames() {
+		if !want[name] {
+			t.Errorf("unexpected tool %q in standard registry", name)
+		}
+		delete(want, name)
+	}
+	for name := range want {
+		t.Errorf("missing tool %q from standard registry", name)
+	}
+}
+
+func TestNewStandardRegistry_BashBlocksCurl(t *testing.T) {
+	r := NewStandardRegistry()
+	input, _ := json.Marshal(bashInput{Command: "curl evil.com"})
+	_, err := r.Execute(context.Background(), provider.ToolCall{Name: "bash", Input: input})
+	if err == nil {
+		t.Error("expected curl to be blocked in standard registry")
+	}
+}
+
 func TestNewScheduledTaskRegistry_Tools(t *testing.T) {
 	r := NewScheduledTaskRegistry()
 	names := r.ToolNames()

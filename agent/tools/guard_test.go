@@ -168,6 +168,55 @@ func TestGuardedAction_RubberStampWarning(t *testing.T) {
 	}
 }
 
+func TestGuardedAction_LowRisk_NotifyError(t *testing.T) {
+	want := errors.New("notify failed")
+	inter := &mockInteractor{notifyErr: want}
+	_, err := GuardedAction(context.Background(), inter, RiskLow, "react", func() (string, error) {
+		return "ok", nil
+	})
+	if !errors.Is(err, want) {
+		t.Errorf("expected notify error for low-risk, got: %v", err)
+	}
+}
+
+func TestGuardedAction_AutoApproveNotifyError(t *testing.T) {
+	rules := NewApprovalRuleSet()
+	rules.Add(ApprovalRule{ToolName: "bash"})
+	want := errors.New("notify failed")
+	inter := &mockInteractor{notifyErr: want}
+	input, _ := json.Marshal(map[string]string{"command": "echo"})
+
+	_, err := GuardedAction(context.Background(), inter, RiskMedium, "run cmd",
+		func() (string, error) { return "ok", nil },
+		WithApprovalRules(rules, "bash", input),
+	)
+	if err == nil || !errors.Is(err, want) {
+		t.Errorf("expected notify error, got: %v", err)
+	}
+}
+
+func TestGuardedAction_LowRisk_ActionError(t *testing.T) {
+	inter := &mockInteractor{}
+	want := errors.New("action failed")
+	_, err := GuardedAction(context.Background(), inter, RiskLow, "react", func() (string, error) {
+		return "", want
+	})
+	if !errors.Is(err, want) {
+		t.Errorf("expected action error, got: %v", err)
+	}
+}
+
+func TestGuardedAction_MediumRisk_ActionError(t *testing.T) {
+	inter := &mockInteractor{approveAll: true}
+	want := errors.New("action failed")
+	_, err := GuardedAction(context.Background(), inter, RiskMedium, "send", func() (string, error) {
+		return "", want
+	})
+	if !errors.Is(err, want) {
+		t.Errorf("expected action error, got: %v", err)
+	}
+}
+
 func TestGuardedWrite_Approved(t *testing.T) {
 	inter := &mockInteractor{approveAll: true}
 	ran := false

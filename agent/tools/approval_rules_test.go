@@ -105,3 +105,30 @@ func TestExtractPattern_UnknownTool(t *testing.T) {
 		t.Errorf("pattern = %q, want unknown", p)
 	}
 }
+
+func TestExtractPattern_InvalidJSON(t *testing.T) {
+	if p := extractPattern("slack_send", json.RawMessage(`{bad`)); p != "" {
+		t.Errorf("pattern = %q, want empty for invalid JSON", p)
+	}
+}
+
+func TestExtractPattern_GWSSingleWordCommand(t *testing.T) {
+	input, _ := json.Marshal(map[string]string{"command": "calendar"})
+	if p := extractPattern("gws_execute", input); p != "calendar" {
+		t.Errorf("pattern = %q, want calendar", p)
+	}
+}
+
+func TestExtractPattern_SlackMissingChannel(t *testing.T) {
+	input, _ := json.Marshal(map[string]string{"text": "hello"})
+	if p := extractPattern("slack_send", input); p != "slack_send" {
+		t.Errorf("pattern = %q, want slack_send (fallback)", p)
+	}
+}
+
+func TestExtractPattern_GWSMissingCommand(t *testing.T) {
+	input, _ := json.Marshal(map[string]string{"foo": "bar"})
+	if p := extractPattern("gws_execute", input); p != "gws_execute" {
+		t.Errorf("pattern = %q, want gws_execute (fallback)", p)
+	}
+}
