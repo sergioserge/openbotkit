@@ -4,11 +4,11 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
-	"log/slog"
-
 	"github.com/priyanshujain/openbotkit/agent"
+	"github.com/priyanshujain/openbotkit/agent/audit"
 	"github.com/priyanshujain/openbotkit/agent/tools"
 	clicli "github.com/priyanshujain/openbotkit/channel/cli"
 	"github.com/priyanshujain/openbotkit/config"
@@ -71,8 +71,17 @@ var chatCmd = &cobra.Command{
 
 		ch := clicli.New(os.Stdin, os.Stdout)
 
+		// Set up audit logging.
+		auditLogger := openAuditLogger()
+		if auditLogger != nil {
+			defer auditLogger.Close()
+		}
+
 		// Build tool registry.
 		toolReg := tools.NewStandardRegistry()
+		if auditLogger != nil {
+			toolReg.SetAudit(auditLogger, "cli")
+		}
 		toolReg.Register(tools.NewSubagentTool(tools.SubagentConfig{
 			Provider:    p,
 			Model:       modelName,
@@ -196,6 +205,10 @@ type cliInteractor struct {
 func (c *cliInteractor) Notify(msg string) error              { return c.ch.Send(msg) }
 func (c *cliInteractor) NotifyLink(text, url string) error    { return c.ch.SendLink(text, url) }
 func (c *cliInteractor) RequestApproval(desc string) (bool, error) { return c.ch.RequestApproval(desc) }
+
+func openAuditLogger() *audit.Logger {
+	return audit.OpenDefault(config.AuditDBPath())
+}
 
 func registerSlackTools(cfg *config.Config, reg *tools.Registry, ch *clicli.Channel) {
 	if cfg.Slack == nil || cfg.Slack.DefaultWorkspace == "" {

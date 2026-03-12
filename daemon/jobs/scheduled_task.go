@@ -10,6 +10,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/priyanshujain/openbotkit/agent"
+	"github.com/priyanshujain/openbotkit/agent/audit"
 	"github.com/priyanshujain/openbotkit/agent/tools"
 	"github.com/priyanshujain/openbotkit/channel"
 	"github.com/priyanshujain/openbotkit/config"
@@ -109,7 +110,12 @@ func (w *ScheduledTaskWorker) runAgent(ctx context.Context, task string) (string
 		return "", fmt.Errorf("provider %q not found", providerName)
 	}
 
-	toolReg := tools.NewStandardRegistry()
+	toolReg := tools.NewScheduledTaskRegistry()
+	al := openAuditLogger()
+	if al != nil {
+		defer al.Close()
+		toolReg.SetAudit(al, "scheduled")
+	}
 
 	identity := "You are a scheduled task agent. Execute the task and return a concise result.\n"
 	blocks := tools.BuildSystemBlocks(identity, toolReg)
@@ -170,6 +176,10 @@ func (w *ScheduledTaskWorker) notifyFailure(ctx context.Context, ch string, meta
 	if err := pusher.Push(ctx, msg); err != nil {
 		slog.Error("scheduled task: push failure notification", "error", err)
 	}
+}
+
+func openAuditLogger() *audit.Logger {
+	return audit.OpenDefault(config.AuditDBPath())
 }
 
 var _ river.Worker[ScheduledTaskArgs] = (*ScheduledTaskWorker)(nil)

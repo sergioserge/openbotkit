@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/priyanshujain/openbotkit/agent"
+	"github.com/priyanshujain/openbotkit/agent/audit"
 	"github.com/priyanshujain/openbotkit/agent/tools"
 	"github.com/priyanshujain/openbotkit/config"
 	"github.com/priyanshujain/openbotkit/internal/skills"
@@ -99,7 +100,7 @@ func (sm *SessionManager) Run(ctx context.Context) {
 func (sm *SessionManager) handleMessage(ctx context.Context, text string) {
 	sm.touchSession()
 
-	a, recorder, err := sm.newAgent()
+	a, recorder, auditLogger, err := sm.newAgent()
 	if err != nil {
 		slog.Error("telegram session: create agent", "error", err)
 		sm.channel.Send(fmt.Sprintf("Error: %v", err))
@@ -107,6 +108,9 @@ func (sm *SessionManager) handleMessage(ctx context.Context, text string) {
 	}
 	if recorder != nil {
 		defer recorder.Close()
+	}
+	if auditLogger != nil {
+		defer auditLogger.Close()
 	}
 
 	response, err := a.Run(ctx, text)
@@ -221,8 +225,12 @@ func (sm *SessionManager) gwsEnabled() bool {
 	return sm.cfg.Integrations != nil && sm.cfg.Integrations.GWS != nil && sm.cfg.Integrations.GWS.Enabled
 }
 
-func (sm *SessionManager) newAgent() (*agent.Agent, *usagesrc.Recorder, error) {
+func (sm *SessionManager) newAgent() (*agent.Agent, *usagesrc.Recorder, *audit.Logger, error) {
 	toolReg := tools.NewStandardRegistry()
+	al := sm.openAuditLogger()
+	if al != nil {
+		toolReg.SetAudit(al, "telegram")
+	}
 
 	if sm.gwsEnabled() && sm.interactor != nil {
 		toolReg.Register(tools.NewGWSExecuteTool(tools.GWSToolConfig{
@@ -257,7 +265,7 @@ func (sm *SessionManager) newAgent() (*agent.Agent, *usagesrc.Recorder, error) {
 	if recorder != nil {
 		opts = append(opts, agent.WithUsageRecorder(recorder))
 	}
-	return agent.New(sm.provider, sm.model, toolReg, opts...), recorder, nil
+	return agent.New(sm.provider, sm.model, toolReg, opts...), recorder, al, nil
 }
 
 func (sm *SessionManager) registerDelegateTool(reg *tools.Registry) {
@@ -384,6 +392,10 @@ func (sm *SessionManager) openUsageRecorder() *usagesrc.Recorder {
 	sm.mu.Unlock()
 
 	return usagesrc.NewRecorder(db, sm.providerName, "telegram", sid)
+}
+
+func (sm *SessionManager) openAuditLogger() *audit.Logger {
+	return audit.OpenDefault(config.AuditDBPath())
 }
 
 func generateSessionID() string {
