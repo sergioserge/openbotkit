@@ -27,9 +27,19 @@ type ScheduledTaskArgs struct {
 
 func (ScheduledTaskArgs) Kind() string { return "scheduled_task" }
 
+// PusherFactory builds a Pusher for delivering results. If nil, the default
+// channel.NewPusher is used.
+type PusherFactory func(channelType string, meta scheduler.ChannelMeta) (channel.Pusher, error)
+
+// AgentRunner executes a task prompt and returns the result text.
+// If nil, the default LLM-based agent is used.
+type AgentRunner func(ctx context.Context, task string) (string, error)
+
 type ScheduledTaskWorker struct {
 	river.WorkerDefaults[ScheduledTaskArgs]
-	Cfg *config.Config
+	Cfg           *config.Config
+	MakePusher    PusherFactory
+	RunAgentFunc  AgentRunner
 }
 
 func (w *ScheduledTaskWorker) Work(ctx context.Context, job *river.Job[ScheduledTaskArgs]) error {
@@ -40,7 +50,11 @@ func (w *ScheduledTaskWorker) Work(ctx context.Context, job *river.Job[Scheduled
 		return fmt.Errorf("parse channel meta: %w", err)
 	}
 
-	result, err := w.runAgent(ctx, job.Args.Task)
+	runAgent := w.runAgent
+	if w.RunAgentFunc != nil {
+		runAgent = w.RunAgentFunc
+	}
+	result, err := runAgent(ctx, job.Args.Task)
 	if err != nil {
 		slog.Error("scheduled task agent failed", "schedule_id", job.Args.ScheduleID, "error", err)
 		w.updateLastRun(job.Args.ScheduleID, err.Error())
@@ -52,7 +66,7 @@ func (w *ScheduledTaskWorker) Work(ctx context.Context, job *river.Job[Scheduled
 		return err
 	}
 
-	pusher, err := channel.NewPusher(job.Args.Channel, meta)
+	pusher, err := w.newPusher(job.Args.Channel, meta)
 	if err != nil {
 		slog.Error("scheduled task: create pusher", "error", err)
 		return nil
@@ -136,8 +150,15 @@ func (w *ScheduledTaskWorker) maybeMarkCompleted(scheduleID int64) {
 	}
 }
 
+func (w *ScheduledTaskWorker) newPusher(channelType string, meta scheduler.ChannelMeta) (channel.Pusher, error) {
+	if w.MakePusher != nil {
+		return w.MakePusher(channelType, meta)
+	}
+	return channel.NewPusher(channelType, meta)
+}
+
 func (w *ScheduledTaskWorker) notifyFailure(ctx context.Context, ch string, meta scheduler.ChannelMeta, scheduleID int64, taskErr error) {
-	pusher, err := channel.NewPusher(ch, meta)
+	pusher, err := w.newPusher(ch, meta)
 	if err != nil {
 		slog.Error("scheduled task: create failure pusher", "error", err)
 		return
