@@ -13,10 +13,3 @@ type Interactor interface {
 	RequestApproval(description string) (approved bool, err error)
 }
 
-// BatchInteractor extends Interactor with the ability to present multiple
-// approval requests at once, reducing approval fatigue. Implementations
-// should present all descriptions together and return a boolean for each.
-type BatchInteractor interface {
-	Interactor
-	RequestBatchApproval(descriptions []string) ([]bool, error)
-}
