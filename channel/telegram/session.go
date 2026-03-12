@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/priyanshujain/openbotkit/agent"
+	"github.com/priyanshujain/openbotkit/agent/audit"
 	"github.com/priyanshujain/openbotkit/agent/tools"
 	"github.com/priyanshujain/openbotkit/config"
 	"github.com/priyanshujain/openbotkit/internal/skills"
@@ -223,6 +226,9 @@ func (sm *SessionManager) gwsEnabled() bool {
 
 func (sm *SessionManager) newAgent() (*agent.Agent, *usagesrc.Recorder, error) {
 	toolReg := tools.NewStandardRegistry()
+	if al := sm.openAuditLogger(); al != nil {
+		toolReg.SetAudit(al, "telegram")
+	}
 
 	if sm.gwsEnabled() && sm.interactor != nil {
 		toolReg.Register(tools.NewGWSExecuteTool(tools.GWSToolConfig{
@@ -384,6 +390,22 @@ func (sm *SessionManager) openUsageRecorder() *usagesrc.Recorder {
 	sm.mu.Unlock()
 
 	return usagesrc.NewRecorder(db, sm.providerName, "telegram", sid)
+}
+
+func (sm *SessionManager) openAuditLogger() *audit.Logger {
+	dir := filepath.Dir(config.AuditDBPath())
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil
+	}
+	db, err := store.Open(store.SQLiteConfig(config.AuditDBPath()))
+	if err != nil {
+		return nil
+	}
+	if err := audit.Migrate(db); err != nil {
+		db.Close()
+		return nil
+	}
+	return audit.NewLogger(db)
 }
 
 func generateSessionID() string {

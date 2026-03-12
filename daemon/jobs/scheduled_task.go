@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/riverqueue/river"
 
 	"github.com/priyanshujain/openbotkit/agent"
+	"github.com/priyanshujain/openbotkit/agent/audit"
 	"github.com/priyanshujain/openbotkit/agent/tools"
 	"github.com/priyanshujain/openbotkit/channel"
 	"github.com/priyanshujain/openbotkit/config"
@@ -110,6 +113,9 @@ func (w *ScheduledTaskWorker) runAgent(ctx context.Context, task string) (string
 	}
 
 	toolReg := tools.NewScheduledTaskRegistry()
+	if al := openAuditLogger(); al != nil {
+		toolReg.SetAudit(al, "scheduled")
+	}
 
 	identity := "You are a scheduled task agent. Execute the task and return a concise result.\n"
 	blocks := tools.BuildSystemBlocks(identity, toolReg)
@@ -170,6 +176,22 @@ func (w *ScheduledTaskWorker) notifyFailure(ctx context.Context, ch string, meta
 	if err := pusher.Push(ctx, msg); err != nil {
 		slog.Error("scheduled task: push failure notification", "error", err)
 	}
+}
+
+func openAuditLogger() *audit.Logger {
+	dir := filepath.Dir(config.AuditDBPath())
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil
+	}
+	db, err := store.Open(store.SQLiteConfig(config.AuditDBPath()))
+	if err != nil {
+		return nil
+	}
+	if err := audit.Migrate(db); err != nil {
+		db.Close()
+		return nil
+	}
+	return audit.NewLogger(db)
 }
 
 var _ river.Worker[ScheduledTaskArgs] = (*ScheduledTaskWorker)(nil)
