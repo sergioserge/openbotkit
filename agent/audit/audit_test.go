@@ -122,7 +122,8 @@ func TestOpenDefault(t *testing.T) {
 }
 
 func TestOpenDefault_BadPath(t *testing.T) {
-	l := OpenDefault("/dev/null/impossible/path.db")
+	// A null byte in the path is invalid on all platforms.
+	l := OpenDefault("/bad\x00path/data.db")
 	if l != nil {
 		l.Close()
 		t.Error("expected nil for bad path")
