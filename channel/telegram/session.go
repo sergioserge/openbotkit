@@ -21,6 +21,7 @@ import (
 	"github.com/priyanshujain/openbotkit/source/scheduler"
 	slacksrc "github.com/priyanshujain/openbotkit/source/slack"
 	usagesrc "github.com/priyanshujain/openbotkit/source/usage"
+	wssrc "github.com/priyanshujain/openbotkit/source/websearch"
 	"github.com/priyanshujain/openbotkit/store"
 )
 
@@ -248,6 +249,7 @@ func (sm *SessionManager) newAgent() (*agent.Agent, *usagesrc.Recorder, *audit.L
 	sm.registerSlackTools(toolReg)
 	sm.registerDelegateTool(toolReg)
 	sm.registerScheduleTools(toolReg)
+	sm.registerWebTools(toolReg)
 
 	toolReg.Register(tools.NewSubagentTool(tools.SubagentConfig{
 		Provider:    sm.provider,
@@ -302,6 +304,53 @@ func (sm *SessionManager) registerScheduleTools(reg *tools.Registry) {
 	reg.Register(tools.NewCreateScheduleTool(deps))
 	reg.Register(tools.NewListSchedulesTool(deps))
 	reg.Register(tools.NewDeleteScheduleTool(deps))
+}
+
+func (sm *SessionManager) registerWebTools(reg *tools.Registry) {
+	var opts []wssrc.Option
+	if err := config.EnsureSourceDir("websearch"); err == nil {
+		db, err := store.Open(store.Config{
+			Driver: sm.cfg.WebSearch.Storage.Driver,
+			DSN:    sm.cfg.WebSearchDataDSN(),
+		})
+		if err == nil {
+			opts = append(opts, wssrc.WithDB(db))
+		}
+	}
+
+	ws := wssrc.New(wssrc.Config{WebSearch: sm.cfg.WebSearch}, opts...)
+
+	fastP, fastModel := sm.resolveFastProvider()
+	if fastP == nil {
+		fastP = sm.provider
+		fastModel = sm.model
+	}
+	deps := tools.WebToolDeps{
+		WS:       ws,
+		Provider: fastP,
+		Model:    fastModel,
+	}
+	reg.Register(tools.NewWebSearchTool(deps))
+	reg.Register(tools.NewWebFetchTool(deps))
+}
+
+func (sm *SessionManager) resolveFastProvider() (provider.Provider, string) {
+	if sm.cfg.Models == nil || sm.cfg.Models.Fast == "" {
+		return nil, ""
+	}
+	provRegistry, err := provider.NewRegistry(sm.cfg.Models)
+	if err != nil {
+		return nil, ""
+	}
+	provName, model, err := provider.ParseModelSpec(sm.cfg.Models.Fast)
+	if err != nil {
+		return nil, ""
+	}
+	p, ok := provRegistry.Get(provName)
+	if !ok {
+		return nil, ""
+	}
+	return p, model
 }
 
 func (sm *SessionManager) registerSlackTools(reg *tools.Registry) {
