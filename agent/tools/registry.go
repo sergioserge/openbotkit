@@ -37,7 +37,9 @@ func (r *Registry) Register(t Tool) {
 // (bash, file_read, file_write, file_edit, load_skills, search_skills).
 func NewStandardRegistry() *Registry {
 	r := NewRegistry()
-	r.Register(NewBashTool(30 * time.Second))
+	r.Register(NewBashTool(30*time.Second,
+		WithCommandFilter(NewBlocklistFilter(DefaultBlocklist)),
+	))
 	r.Register(&FileReadTool{})
 	r.Register(&FileWriteTool{})
 	r.Register(&FileEditTool{})
