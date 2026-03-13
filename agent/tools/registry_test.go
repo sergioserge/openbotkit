@@ -231,6 +231,25 @@ func TestRegistry_FileFallback_NoScratchDir(t *testing.T) {
 	}
 }
 
+func TestRegistry_FileFallback_DirCreationFails(t *testing.T) {
+	bigOutput := strings.Repeat("x\n", 5000)
+	r := NewRegistry()
+	r.Register(&stubTool{name: "big", output: bigOutput})
+	// Point to an unwritable path.
+	r.SetScratchDir("/proc/nonexistent/scratch")
+
+	output, err := r.Execute(context.Background(), provider.ToolCall{
+		Name: "big", ID: "c5", Input: json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	// Should gracefully skip file fallback — no stub, just (possibly truncated) output.
+	if strings.Contains(output, "Full output:") {
+		t.Error("file fallback should be skipped when dir creation fails")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchSubstring(s, substr)
 }
