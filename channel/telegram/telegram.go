@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -54,8 +55,7 @@ func (c *Channel) Send(msg string) error {
 	m := tgbotapi.NewMessage(c.chatID, html)
 	m.ParseMode = "HTML"
 	_, err := c.bot.Send(m)
-	if err != nil {
-		// HTML parse failed — retry as plain text.
+	if isTelegramBadRequest(err) {
 		m.Text = msg
 		m.ParseMode = ""
 		_, err = c.bot.Send(m)
@@ -128,6 +128,14 @@ func (c *Channel) HandleCallback(data string) {
 // PushMessage enqueues an incoming message from the poller.
 func (c *Channel) PushMessage(text string, messageID int) {
 	c.incoming <- incomingMessage{text: text, messageID: messageID}
+}
+
+// isTelegramBadRequest returns true if the error is a Telegram API 400 error
+// (e.g. HTML parse failure). Other errors (network, rate limit) are not retried
+// to avoid sending duplicate messages.
+func isTelegramBadRequest(err error) bool {
+	var apiErr *tgbotapi.Error
+	return errors.As(err, &apiErr) && apiErr.Code == 400
 }
 
 // Close shuts down the incoming channel.
