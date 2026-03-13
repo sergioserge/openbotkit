@@ -20,11 +20,17 @@ type approvalResponse struct {
 	err      error
 }
 
+// incomingMessage carries both the text and the Telegram message ID.
+type incomingMessage struct {
+	text      string
+	messageID int
+}
+
 // Channel implements channel.Channel for Telegram.
 type Channel struct {
 	bot      botSender
 	chatID   int64
-	incoming chan string
+	incoming chan incomingMessage
 	done     chan struct{}
 
 	approvalMu sync.Mutex
@@ -35,7 +41,7 @@ func NewChannel(bot botSender, chatID int64) *Channel {
 	return &Channel{
 		bot:      bot,
 		chatID:   chatID,
-		incoming: make(chan string, 16),
+		incoming: make(chan incomingMessage, 16),
 		done:     make(chan struct{}),
 	}
 }
@@ -50,11 +56,20 @@ func (c *Channel) Send(msg string) error {
 }
 
 func (c *Channel) Receive() (string, error) {
-	text, ok := <-c.incoming
+	msg, ok := <-c.incoming
 	if !ok {
 		return "", io.EOF
 	}
-	return text, nil
+	return msg.text, nil
+}
+
+// ReceiveMessage returns the next incoming message with its Telegram message ID.
+func (c *Channel) ReceiveMessage() (incomingMessage, error) {
+	msg, ok := <-c.incoming
+	if !ok {
+		return incomingMessage{}, io.EOF
+	}
+	return msg, nil
 }
 
 func (c *Channel) SendLink(text string, url string) error {
@@ -103,8 +118,8 @@ func (c *Channel) HandleCallback(data string) {
 }
 
 // PushMessage enqueues an incoming message from the poller.
-func (c *Channel) PushMessage(text string) {
-	c.incoming <- text
+func (c *Channel) PushMessage(text string, messageID int) {
+	c.incoming <- incomingMessage{text: text, messageID: messageID}
 }
 
 // Close shuts down the incoming channel.

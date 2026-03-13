@@ -78,7 +78,7 @@ func TestReceive_ReturnsIncomingMessage(t *testing.T) {
 	bot := &mockBot{}
 	ch := NewChannel(bot, 123)
 
-	ch.PushMessage("hello")
+	ch.PushMessage("hello", 1)
 
 	text, err := ch.Receive()
 	if err != nil {
