@@ -173,7 +173,7 @@ func TestStartCommand_ResetsSession(t *testing.T) {
 	}
 	sm.messages = []string{"hello"}
 
-	sm.handleMessage(context.Background(), "/start")
+	sm.handleMessage(context.Background(), "/start", 0)
 
 	if sm.sessionID != "" {
 		t.Fatalf("expected cleared sessionID, got %q", sm.sessionID)
@@ -202,7 +202,7 @@ func TestStartCommand_WithSuffix(t *testing.T) {
 	sm := &SessionManager{cfg: cfg, channel: ch}
 	sm.sessionID = "tg-xyz"
 
-	sm.handleMessage(context.Background(), "/start now")
+	sm.handleMessage(context.Background(), "/start now", 0)
 
 	if sm.sessionID != "" {
 		t.Fatalf("expected cleared sessionID, got %q", sm.sessionID)
@@ -239,7 +239,7 @@ func TestNormalMessage_DoesNotReset(t *testing.T) {
 	}
 	sm.messages = []string{"prior"}
 
-	sm.handleMessage(context.Background(), "hello")
+	sm.handleMessage(context.Background(), "hello", 0)
 
 	// Session was NOT reset — it should still be "tg-existing"
 	if sm.sessionID != "tg-existing" {
@@ -502,7 +502,7 @@ func TestHandleMessage_UpdatesHistoryAndMessages(t *testing.T) {
 		fastModel:    "test-model",
 	}
 
-	sm.handleMessage(context.Background(), "hello world")
+	sm.handleMessage(context.Background(), "hello world", 0)
 
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -541,7 +541,7 @@ func TestHandleMessage_SavesHistoryToDB(t *testing.T) {
 		fastModel:    "test-model",
 	}
 
-	sm.handleMessage(context.Background(), "test input")
+	sm.handleMessage(context.Background(), "test input", 0)
 
 	sm.mu.Lock()
 	sid := sm.sessionID
@@ -583,9 +583,9 @@ func TestHandleMessage_MultiTurnAccumulates(t *testing.T) {
 		fastModel:    "test-model",
 	}
 
-	sm.handleMessage(context.Background(), "first")
-	sm.handleMessage(context.Background(), "second")
-	sm.handleMessage(context.Background(), "third")
+	sm.handleMessage(context.Background(), "first", 0)
+	sm.handleMessage(context.Background(), "second", 0)
+	sm.handleMessage(context.Background(), "third", 0)
 
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -663,7 +663,7 @@ func TestNewAgent_CreatesAgentWithOptions(t *testing.T) {
 	// taskTracker is required by newAgent's tool registration
 	sm.taskTracker = newTaskTracker()
 
-	a, recorder, auditLogger, err := sm.newAgent(nil)
+	a, recorder, auditLogger, err := sm.newAgent(nil, nil)
 	if err != nil {
 		t.Fatalf("newAgent: %v", err)
 	}
@@ -701,7 +701,7 @@ func TestNewAgent_WithHistory(t *testing.T) {
 		provider.NewTextMessage(provider.RoleAssistant, "prior resp"),
 	}
 
-	a, _, _, err := sm.newAgent(history)
+	a, _, _, err := sm.newAgent(history, nil)
 	if err != nil {
 		t.Fatalf("newAgent: %v", err)
 	}
@@ -765,7 +765,7 @@ func TestRun_ProcessesMessages(t *testing.T) {
 		close(done)
 	}()
 
-	ch.PushMessage("hello from run test")
+	ch.PushMessage("hello from run test", 0)
 
 	// Wait briefly for the message to be processed
 	time.Sleep(500 * time.Millisecond)

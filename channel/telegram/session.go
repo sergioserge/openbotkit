@@ -90,7 +90,7 @@ func NewSessionManager(cfg *config.Config, ch *Channel, p provider.Provider, pro
 
 func (sm *SessionManager) Run(ctx context.Context) {
 	for {
-		text, err := sm.channel.Receive()
+		msg, err := sm.channel.ReceiveMessage()
 		if err == io.EOF {
 			sm.endSession()
 			return
@@ -100,11 +100,11 @@ func (sm *SessionManager) Run(ctx context.Context) {
 			continue
 		}
 
-		sm.handleMessage(ctx, text)
+		sm.handleMessage(ctx, msg.text, msg.messageID)
 	}
 }
 
-func (sm *SessionManager) handleMessage(ctx context.Context, text string) {
+func (sm *SessionManager) handleMessage(ctx context.Context, text string, messageID int) {
 	if strings.HasPrefix(text, "/start") {
 		sm.endSession()
 		sm.channel.Send("Session reset. Starting fresh.")
@@ -118,8 +118,15 @@ func (sm *SessionManager) handleMessage(ctx context.Context, text string) {
 	copy(priorHistory, sm.history)
 	sm.mu.Unlock()
 
-	a, recorder, auditLogger, err := sm.newAgent(priorHistory)
+	fb := newProcessingFeedback(
+		sm.channel.bot, sm.channel.chatID, messageID,
+		text, sm.fastProvider, sm.fastModel,
+	)
+	fb.Start(ctx)
+
+	a, recorder, auditLogger, err := sm.newAgent(priorHistory, fb.Signal)
 	if err != nil {
+		fb.Stop()
 		slog.Error("telegram session: create agent", "error", err)
 		sm.channel.Send(fmt.Sprintf("Error: %v", err))
 		return
@@ -132,6 +139,7 @@ func (sm *SessionManager) handleMessage(ctx context.Context, text string) {
 	}
 
 	response, err := a.Run(ctx, text)
+	fb.Stop()
 	if err != nil {
 		slog.Error("telegram session: agent error", "error", err)
 		sm.channel.Send(fmt.Sprintf("Error: %v", err))
@@ -317,7 +325,7 @@ func (sm *SessionManager) gwsEnabled() bool {
 	return sm.cfg.Integrations != nil && sm.cfg.Integrations.GWS != nil && sm.cfg.Integrations.GWS.Enabled
 }
 
-func (sm *SessionManager) newAgent(history []provider.Message) (*agent.Agent, *usagesrc.Recorder, *audit.Logger, error) {
+func (sm *SessionManager) newAgent(history []provider.Message, onToolStart func(string)) (*agent.Agent, *usagesrc.Recorder, *audit.Logger, error) {
 	toolReg := tools.NewStandardRegistry()
 	al := sm.openAuditLogger()
 	if al != nil {
@@ -367,7 +375,11 @@ func (sm *SessionManager) newAgent(history []provider.Message) (*agent.Agent, *u
 	if recorder != nil {
 		opts = append(opts, agent.WithUsageRecorder(recorder))
 	}
-	return agent.New(sm.provider, sm.model, toolReg, opts...), recorder, al, nil
+	var executor agent.ToolExecutor = toolReg
+	if onToolStart != nil {
+		executor = &notifyingExecutor{delegate: toolReg, onToolStart: onToolStart}
+	}
+	return agent.New(sm.provider, sm.model, executor, opts...), recorder, al, nil
 }
 
 func (sm *SessionManager) registerDelegateTool(reg *tools.Registry) {
