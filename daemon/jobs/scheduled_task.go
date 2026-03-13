@@ -111,6 +111,11 @@ func (w *ScheduledTaskWorker) runAgent(ctx context.Context, task string) (string
 	}
 
 	toolReg := tools.NewScheduledTaskRegistry()
+	sessionID := fmt.Sprintf("sched-%d", time.Now().UnixMilli())
+	config.EnsureScratchDir(sessionID)
+	toolReg.SetScratchDir(config.ScratchDir(sessionID))
+	defer config.CleanScratch(sessionID)
+
 	al := openAuditLogger()
 	if al != nil {
 		defer al.Close()

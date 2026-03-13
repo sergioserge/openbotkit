@@ -201,10 +201,15 @@ func (g *Gemini) buildRequest(req provider.ChatRequest) map[string]any {
 		body["tools"] = toolsVal
 	}
 
+	genConfig := map[string]any{}
 	if req.MaxTokens > 0 {
-		body["generationConfig"] = map[string]any{
-			"maxOutputTokens": req.MaxTokens,
-		}
+		genConfig["maxOutputTokens"] = req.MaxTokens
+	}
+	if req.DisableThinking {
+		genConfig["thinkingConfig"] = map[string]any{"thinkingBudget": 0}
+	}
+	if len(genConfig) > 0 {
+		body["generationConfig"] = genConfig
 	}
 
 	return body
