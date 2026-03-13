@@ -213,7 +213,8 @@ func (f *processingFeedback) decideAck(ctx context.Context, toolName string) ack
 			provider.NewTextMessage(provider.RoleUser,
 				fmt.Sprintf("User message: %q\nTool running: %s", f.userText, toolName)),
 		},
-		MaxTokens: 100,
+		MaxTokens:       100,
+		DisableThinking: true,
 	})
 	if err != nil {
 		d := f.fallbackDecision(toolName)
