@@ -145,14 +145,56 @@ func (sm *SessionManager) handleMessage(ctx context.Context, text string) {
 	sm.saveHistory(sid, text, response)
 }
 
+func (sm *SessionManager) restoreSession() bool {
+	histDB, err := store.Open(store.Config{
+		Driver: sm.cfg.History.Storage.Driver,
+		DSN:    sm.cfg.HistoryDataDSN(),
+	})
+	if err != nil {
+		return false
+	}
+	defer histDB.Close()
+
+	if err := historysrc.Migrate(histDB); err != nil {
+		return false
+	}
+
+	recent, err := historysrc.LoadRecentSession(histDB, "telegram", sessionTimeout)
+	if err != nil || recent == nil {
+		return false
+	}
+
+	msgs, err := historysrc.LoadSessionMessages(histDB, recent.SessionID, 100)
+	if err != nil || len(msgs) == 0 {
+		return false
+	}
+
+	sm.sessionID = recent.SessionID
+	sm.messages = nil
+	sm.history = nil
+	for _, m := range msgs {
+		role := provider.RoleUser
+		if m.Role == "assistant" {
+			role = provider.RoleAssistant
+		}
+		sm.history = append(sm.history, provider.NewTextMessage(role, m.Content))
+		if m.Role == "user" {
+			sm.messages = append(sm.messages, m.Content)
+		}
+	}
+	return true
+}
+
 // touchSession resets the inactivity timer, starting a new session if needed.
 func (sm *SessionManager) touchSession() {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	if sm.sessionID == "" {
-		sm.sessionID = generateSessionID()
-		sm.messages = nil
+		if !sm.restoreSession() {
+			sm.sessionID = generateSessionID()
+			sm.messages = nil
+		}
 	}
 
 	if sm.timer != nil {
