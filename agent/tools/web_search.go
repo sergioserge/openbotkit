@@ -64,8 +64,8 @@ func (t *WebSearchTool) Execute(ctx context.Context, input json.RawMessage) (str
 	}
 
 	out := formatSearchResult(result)
-	out = TruncateHead(out, 500)
-	out = TruncateBytes(out, 50*1024)
+	out = TruncateHead(out, MaxLinesWebSearch)
+	out = TruncateBytes(out, MaxOutputBytes)
 	return out, nil
 }
 

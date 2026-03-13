@@ -78,8 +78,8 @@ func (t *WebFetchTool) Execute(ctx context.Context, input json.RawMessage) (stri
 	content := result.Content
 	if len(content) <= shortContentThreshold {
 		out := fmt.Sprintf("Source: %s\n\n%s", in.URL, content)
-		out = TruncateHead(out, 1000)
-		out = TruncateBytes(out, 50*1024)
+		out = TruncateHead(out, MaxLinesWebFetch)
+		out = TruncateBytes(out, MaxOutputBytes)
 		return out, nil
 	}
 
@@ -88,8 +88,8 @@ func (t *WebFetchTool) Execute(ctx context.Context, input json.RawMessage) (stri
 		return "", fmt.Errorf("summarize: %w", err)
 	}
 	out := fmt.Sprintf("Source: %s\n\n%s", in.URL, summary)
-	out = TruncateHead(out, 1000)
-	out = TruncateBytes(out, 50*1024)
+	out = TruncateHead(out, MaxLinesWebFetch)
+	out = TruncateBytes(out, MaxOutputBytes)
 	return out, nil
 }
 

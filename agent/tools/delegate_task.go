@@ -144,8 +144,8 @@ func (d *DelegateTaskTool) Execute(ctx context.Context, input json.RawMessage) (
 	out, err := GuardedAction(ctx, d.interactor, RiskHigh, desc, func() (string, error) {
 		return runner.Run(ctx, prompt, d.timeout, runOpts...)
 	}, guardOpts...)
-	out = TruncateHeadTail(out, 500, 500)
-	out = TruncateBytes(out, 50*1024)
+	out = TruncateHeadTail(out, MaxLinesHeadTail, MaxLinesHeadTail)
+	out = TruncateBytes(out, MaxOutputBytes)
 	return out, err
 }
 

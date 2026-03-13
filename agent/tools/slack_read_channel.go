@@ -86,7 +86,7 @@ func (t *SlackReadChannelTool) Execute(ctx context.Context, input json.RawMessag
 	if err != nil {
 		return "", err
 	}
-	out = TruncateHead(out, 1000)
-	out = TruncateBytes(out, 50*1024)
+	out = TruncateHead(out, MaxLinesSlack)
+	out = TruncateBytes(out, MaxOutputBytes)
 	return out, nil
 }

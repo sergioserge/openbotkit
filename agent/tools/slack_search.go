@@ -82,8 +82,8 @@ func (t *SlackSearchTool) Execute(ctx context.Context, input json.RawMessage) (s
 			return "", err
 		}
 	}
-	out = TruncateHead(out, 1000)
-	out = TruncateBytes(out, 50*1024)
+	out = TruncateHead(out, MaxLinesSlack)
+	out = TruncateBytes(out, MaxOutputBytes)
 	return out, nil
 }
 

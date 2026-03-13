@@ -58,7 +58,7 @@ func (l *LoadSkillsTool) Execute(_ context.Context, input json.RawMessage) (stri
 	}
 
 	result := strings.Join(parts, "\n\n")
-	return TruncateBytes(result, 50*1024), nil
+	return TruncateBytes(result, MaxOutputBytes), nil
 }
 
 // ensureGWSShared prepends gws-shared to the list when any gws-* skill is
