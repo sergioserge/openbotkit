@@ -92,6 +92,10 @@ func (g *GWSExecuteTool) Execute(ctx context.Context, input json.RawMessage) (st
 	}
 
 	args := strings.Fields(in.Command)
+	// Strip leading "gws" if present — the runner already adds it.
+	if len(args) > 0 && args[0] == "gws" {
+		args = args[1:]
+	}
 	service := gwsServiceFromCommand(args)
 	isWrite := g.isWriteCommand(args)
 
