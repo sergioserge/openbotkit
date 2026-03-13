@@ -6,6 +6,31 @@ import (
 	"time"
 )
 
+func TestParseTimestamp(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"sqlite format", "2026-03-13 10:30:00", true},
+		{"iso8601 utc", "2026-03-13T10:30:00Z", true},
+		{"rfc3339", "2026-03-13T10:30:00+05:30", true},
+		{"invalid", "not-a-date", false},
+		{"empty", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseTimestamp(tt.input)
+			if tt.want && got == nil {
+				t.Errorf("parseTimestamp(%q) = nil, want non-nil", tt.input)
+			}
+			if !tt.want && got != nil {
+				t.Errorf("parseTimestamp(%q) = %v, want nil", tt.input, got)
+			}
+		})
+	}
+}
+
 func TestUpsertConversation(t *testing.T) {
 	db := testDB(t)
 	if err := Migrate(db); err != nil {
