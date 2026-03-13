@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/priyanshujain/openbotkit/agent/audit"
@@ -23,10 +26,14 @@ type Tool interface {
 
 // Registry holds registered tools and implements agent.ToolExecutor.
 type Registry struct {
-	tools    map[string]Tool
-	auditor  *audit.Logger
-	auditCtx string
+	tools      map[string]Tool
+	auditor    *audit.Logger
+	auditCtx   string
+	scratchDir string
 }
+
+// SetScratchDir enables file fallback for large tool outputs.
+func (r *Registry) SetScratchDir(dir string) { r.scratchDir = dir }
 
 // NewRegistry creates an empty tool registry.
 func NewRegistry() *Registry {
@@ -103,6 +110,7 @@ func (r *Registry) Execute(ctx context.Context, call provider.ToolCall) (string,
 		output = output[:maxOutputBytes] + fmt.Sprintf(
 			"\n...[output truncated, showing first 100KB of %dKB]", len(output)/1024)
 	}
+	output = r.fileFallback(output, call)
 	if r.auditor != nil {
 		errStr := ""
 		if err != nil {
@@ -125,6 +133,24 @@ func (r *Registry) Execute(ctx context.Context, call provider.ToolCall) (string,
 		output = WrapUntrustedContent(call.Name, output)
 	}
 	return output, err
+}
+
+const fileFallbackThreshold = 8192 // 8K chars
+
+func (r *Registry) fileFallback(output string, call provider.ToolCall) string {
+	if r.scratchDir == "" || len(output) <= fileFallbackThreshold {
+		return output
+	}
+	path := filepath.Join(r.scratchDir, fmt.Sprintf("%s_%s.txt", call.Name, call.ID))
+	if err := os.MkdirAll(r.scratchDir, 0700); err != nil {
+		return output
+	}
+	if err := os.WriteFile(path, []byte(output), 0600); err != nil {
+		return output
+	}
+	preview := TruncateHead(output, 40)
+	totalLines := strings.Count(output, "\n") + 1
+	return fmt.Sprintf("%s\n\n[Showing first 40 of %d lines. Full output: %s]", preview, totalLines, path)
 }
 
 // ToolSchemas implements agent.ToolExecutor.
