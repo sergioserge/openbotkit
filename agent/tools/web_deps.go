@@ -32,18 +32,23 @@ type WebSearchSetup struct {
 // Returns the WebSearch instance and the DB handle (nil if no cache).
 // The caller is responsible for closing the DB handle.
 func NewWebSearchInstance(s WebSearchSetup) (*websearch.WebSearch, *store.DB) {
+	if s.WSConfig == nil {
+		return websearch.New(websearch.Config{}), nil
+	}
 	var (
 		opts []websearch.Option
 		db   *store.DB
 	)
-	if err := config.EnsureSourceDir("websearch"); err == nil {
-		opened, err := store.Open(store.Config{
-			Driver: s.WSConfig.Storage.Driver,
-			DSN:    s.DSN,
-		})
-		if err == nil {
-			db = opened
-			opts = append(opts, websearch.WithDB(db))
+	if s.DSN != "" {
+		if err := config.EnsureSourceDir("websearch"); err == nil {
+			opened, err := store.Open(store.Config{
+				Driver: s.WSConfig.Storage.Driver,
+				DSN:    s.DSN,
+			})
+			if err == nil {
+				db = opened
+				opts = append(opts, websearch.WithDB(db))
+			}
 		}
 	}
 	return websearch.New(websearch.Config{WebSearch: s.WSConfig}, opts...), db
