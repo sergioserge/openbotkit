@@ -18,7 +18,9 @@ const (
 )
 
 type ServiceConfig struct {
+	Name       string   // service name, e.g. "daemon" or "server"
 	BinaryPath string
+	Args       []string // command arguments, e.g. ["service", "run"]
 	LogPath    string
 }
 
@@ -35,7 +37,7 @@ func DetectPlatform() Platform {
 	}
 }
 
-func DefaultConfig() (*ServiceConfig, error) {
+func DefaultConfig(name string, args []string) (*ServiceConfig, error) {
 	binPath, err := exec.LookPath("obk")
 	if err != nil {
 		binPath, err = os.Executable()
@@ -54,8 +56,10 @@ func DefaultConfig() (*ServiceConfig, error) {
 	}
 
 	return &ServiceConfig{
+		Name:       name,
 		BinaryPath: binPath,
-		LogPath:    filepath.Join(home, ".obk", "daemon.log"),
+		Args:       args,
+		LogPath:    filepath.Join(home, ".obk", name+".log"),
 	}, nil
 }
 
@@ -67,14 +71,14 @@ type Manager interface {
 	Status() (string, error)
 }
 
-func NewManager() (Manager, error) {
+func NewManager(name string) (Manager, error) {
 	switch DetectPlatform() {
 	case PlatformMacOS:
-		return &launchdManager{}, nil
+		return &launchdManager{name: name}, nil
 	case PlatformLinux:
-		return &systemdManager{}, nil
+		return &systemdManager{name: name}, nil
 	case PlatformWindows:
-		return &windowsManager{}, nil
+		return &windowsManager{name: name}, nil
 	default:
 		return nil, fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}

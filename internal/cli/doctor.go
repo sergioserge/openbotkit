@@ -132,7 +132,7 @@ func checkDatabases(cfg *config.Config) []checkResult {
 }
 
 func checkService() checkResult {
-	mgr, err := service.NewManager()
+	mgr, err := service.NewManager("daemon")
 	if err != nil {
 		return checkResult{"Service", "WARN", err.Error()}
 	}
