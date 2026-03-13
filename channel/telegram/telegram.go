@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/priyanshujain/openbotkit/channel/tghtml"
 )
 
 // botSender abstracts the Telegram bot API for testing.
@@ -49,11 +50,13 @@ func NewChannel(bot botSender, chatID int64) *Channel {
 func (c *Channel) ChatID() int64 { return c.chatID }
 
 func (c *Channel) Send(msg string) error {
-	m := tgbotapi.NewMessage(c.chatID, msg)
-	m.ParseMode = "Markdown"
+	html := tghtml.Convert(msg)
+	m := tgbotapi.NewMessage(c.chatID, html)
+	m.ParseMode = "HTML"
 	_, err := c.bot.Send(m)
 	if err != nil {
-		// Markdown parse failed — retry as plain text.
+		// HTML parse failed — retry as plain text.
+		m.Text = msg
 		m.ParseMode = ""
 		_, err = c.bot.Send(m)
 	}

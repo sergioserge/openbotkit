@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/priyanshujain/openbotkit/channel/tghtml"
 )
 
 type TelegramPusher struct {
@@ -23,8 +24,14 @@ func NewTelegramPusher(botToken string, chatID int64) (*TelegramPusher, error) {
 }
 
 func (p *TelegramPusher) Push(_ context.Context, message string) error {
-	m := tgbotapi.NewMessage(p.chatID, message)
-	m.ParseMode = "Markdown"
+	html := tghtml.Convert(message)
+	m := tgbotapi.NewMessage(p.chatID, html)
+	m.ParseMode = "HTML"
 	_, err := p.bot.Send(m)
+	if err != nil {
+		m.Text = message
+		m.ParseMode = ""
+		_, err = p.bot.Send(m)
+	}
 	return err
 }
