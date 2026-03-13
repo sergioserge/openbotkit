@@ -75,6 +75,9 @@ var chatCmd = &cobra.Command{
 
 		// Build tool registry.
 		toolReg := tools.NewStandardRegistry()
+		config.EnsureScratchDir(sessionID)
+		toolReg.SetScratchDir(config.ScratchDir(sessionID))
+		defer config.CleanScratch(sessionID)
 		if auditLogger != nil {
 			toolReg.SetAudit(auditLogger, "cli")
 		}
