@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -56,7 +57,7 @@ func TestEnsureScratchDir_Creates(t *testing.T) {
 	if !info.IsDir() {
 		t.Error("expected directory")
 	}
-	if info.Mode().Perm() != 0700 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0700 {
 		t.Errorf("perm = %o, want 0700", info.Mode().Perm())
 	}
 }
