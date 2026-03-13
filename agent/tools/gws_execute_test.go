@@ -77,7 +77,7 @@ func TestGWSExecute_ReadPath(t *testing.T) {
 	tool, inter, runner := setupGWSTest(t, false, nil)
 	runner.outputs["calendar events list"] = `{"items":[]}`
 
-	input, _ := json.Marshal(gwsInput{Command: "calendar events.list"})
+	input, _ := json.Marshal(gwsInput{Command: "calendar events list"})
 	result, err := tool.Execute(context.Background(), input)
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -156,7 +156,7 @@ func TestGWSExecute_MissingScopeTimeout(t *testing.T) {
 	// Use scopes map that doesn't have calendar.
 	tool, inter, _ := setupGWSTest(t, false, map[string]bool{})
 
-	input, _ := json.Marshal(gwsInput{Command: "calendar events.list"})
+	input, _ := json.Marshal(gwsInput{Command: "calendar events list"})
 	_, err := tool.Execute(context.Background(), input)
 	if err == nil {
 		t.Fatal("expected auth timeout error")
@@ -226,7 +226,7 @@ func TestGWSExecute_MissingScopeSignaled(t *testing.T) {
 	var result string
 	var execErr error
 	go func() {
-		input, _ := json.Marshal(gwsInput{Command: "calendar events.list"})
+		input, _ := json.Marshal(gwsInput{Command: "calendar events list"})
 		result, execErr = tool.Execute(context.Background(), input)
 		close(done)
 	}()
@@ -284,7 +284,7 @@ func TestGWSExecute_KeywordNotWrite(t *testing.T) {
 	tool, inter, runner := setupGWSTest(t, false, nil)
 	runner.outputs["calendar events delete --id 123"] = "deleted"
 
-	input, _ := json.Marshal(gwsInput{Command: "calendar events.delete --id 123"})
+	input, _ := json.Marshal(gwsInput{Command: "calendar events delete --id 123"})
 	result, err := tool.Execute(context.Background(), input)
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -323,48 +323,6 @@ func TestGWSExecute_ScopesForService(t *testing.T) {
 		} else if len(scopes) != 1 || scopes[0] != tt.want {
 			t.Errorf("scopesForService(%q) = %v, want [%s]", tt.service, scopes, tt.want)
 		}
-	}
-}
-
-func TestGWSExecute_StripGWSPrefix(t *testing.T) {
-	tool, _, runner := setupGWSTest(t, false, nil)
-	runner.outputs["calendar events list"] = `{"items":[]}`
-
-	input, _ := json.Marshal(gwsInput{Command: "gws calendar events.list"})
-	result, err := tool.Execute(context.Background(), input)
-	if err != nil {
-		t.Fatalf("Execute: %v", err)
-	}
-	if result != `{"items":[]}` {
-		t.Errorf("result = %q", result)
-	}
-	if len(runner.ran) != 1 {
-		t.Fatalf("expected 1 run, got %d", len(runner.ran))
-	}
-	if runner.ran[0].args[0] != "calendar" {
-		t.Errorf("first arg = %q, want 'calendar'", runner.ran[0].args[0])
-	}
-}
-
-func TestExpandDotArgs(t *testing.T) {
-	tests := []struct {
-		name string
-		in   []string
-		want []string
-	}{
-		{"dot syntax", []string{"drive", "files.list"}, []string{"drive", "files", "list"}},
-		{"already expanded", []string{"drive", "files", "list"}, []string{"drive", "files", "list"}},
-		{"flag not expanded", []string{"drive", "files", "list", "--pageSize", "5"}, []string{"drive", "files", "list", "--pageSize", "5"}},
-		{"mimeType not expanded", []string{"--q", "mimeType='application/vnd.google-apps.document'"}, []string{"--q", "mimeType='application/vnd.google-apps.document'"}},
-		{"url not expanded", []string{"--sanitize", "projects/p/locations/l/templates/t"}, []string{"--sanitize", "projects/p/locations/l/templates/t"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := expandDotArgs(tt.in)
-			if strings.Join(got, " ") != strings.Join(tt.want, " ") {
-				t.Errorf("expandDotArgs(%v) = %v, want %v", tt.in, got, tt.want)
-			}
-		})
 	}
 }
 
