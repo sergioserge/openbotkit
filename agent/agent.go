@@ -98,11 +98,13 @@ func WithSummarizer(s Summarizer) Option {
 // New creates a new Agent.
 func New(p provider.Provider, model string, executor ToolExecutor, opts ...Option) *Agent {
 	a := &Agent{
-		provider:   p,
-		model:      model,
-		executor:   executor,
-		maxIter:    25,
-		maxHistory: defaultMaxHistory,
+		provider:            p,
+		model:               model,
+		executor:            executor,
+		maxIter:             25,
+		maxHistory:          defaultMaxHistory,
+		contextWindow:       1_000_000,
+		compactionThreshold: 0.6,
 	}
 	for _, opt := range opts {
 		opt(a)
