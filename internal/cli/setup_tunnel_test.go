@@ -42,4 +42,25 @@ func TestWriteNgrokConfig(t *testing.T) {
 	if !strings.Contains(content, `version: "3"`) {
 		t.Error("config missing version")
 	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0600 {
+		t.Errorf("file permissions = %o, want 0600", perm)
+	}
+}
+
+func TestWriteNgrokConfig_CreatesParentDirs(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nested", "deep", "ngrok.yml")
+
+	err := writeNgrokConfig(path, "tok", "example.ngrok-free.app")
+	if err != nil {
+		t.Fatalf("writeNgrokConfig: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("file not created: %v", err)
+	}
 }

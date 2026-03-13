@@ -333,6 +333,14 @@ func TestGWSCallbackURL_Nil(t *testing.T) {
 	}
 }
 
+func TestGWSCallbackURL_IntegrationsSetGWSNil(t *testing.T) {
+	cfg := Default()
+	cfg.Integrations = &IntegrationsConfig{}
+	if url := cfg.GWSCallbackURL(); url != "" {
+		t.Fatalf("expected empty when GWS is nil, got %q", url)
+	}
+}
+
 func TestGWSCallbackURL_Set(t *testing.T) {
 	cfg := Default()
 	cfg.Integrations = &IntegrationsConfig{

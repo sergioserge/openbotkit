@@ -100,17 +100,26 @@ func TestLoadConfig_CustomRedirectURL(t *testing.T) {
 	}
 }
 
-func TestImplicitScopesIncluded(t *testing.T) {
-	// loadConfig should always include openid + email.
-	// We can't call loadConfig without a real file, but we can verify the constant.
-	if len(implicitScopes) != 2 {
-		t.Fatalf("expected 2 implicit scopes, got %d", len(implicitScopes))
+func TestLoadConfig_MergesImplicitScopes(t *testing.T) {
+	path := fakeCredentials(t)
+	cfg, err := loadConfig(path, []string{"https://www.googleapis.com/auth/drive"}, "")
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
 	}
-	found := map[string]bool{}
-	for _, s := range implicitScopes {
-		found[s] = true
+	scopeSet := make(map[string]bool)
+	for _, s := range cfg.Scopes {
+		scopeSet[s] = true
 	}
-	if !found["openid"] || !found["email"] {
-		t.Errorf("implicit scopes should contain openid and email, got %v", implicitScopes)
+	for _, want := range []string{"openid", "email", "https://www.googleapis.com/auth/drive"} {
+		if !scopeSet[want] {
+			t.Errorf("missing scope %q in %v", want, cfg.Scopes)
+		}
+	}
+}
+
+func TestLoadConfig_MissingFile(t *testing.T) {
+	_, err := loadConfig("/nonexistent/credentials.json", []string{"openid"}, "")
+	if err == nil {
+		t.Fatal("expected error for missing credentials file")
 	}
 }
