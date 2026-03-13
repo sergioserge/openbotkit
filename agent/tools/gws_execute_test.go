@@ -75,7 +75,7 @@ func setupGWSTest(t *testing.T, approveAll bool, scopes map[string]bool) (*GWSEx
 
 func TestGWSExecute_ReadPath(t *testing.T) {
 	tool, inter, runner := setupGWSTest(t, false, nil)
-	runner.outputs["calendar events.list"] = `{"items":[]}`
+	runner.outputs["calendar events list"] = `{"items":[]}`
 
 	input, _ := json.Marshal(gwsInput{Command: "calendar events.list"})
 	result, err := tool.Execute(context.Background(), input)
@@ -197,7 +197,7 @@ func TestGWSExecute_MissingScopeSignaled(t *testing.T) {
 	bridge := NewTokenBridge(g, "user@test.com")
 	linkCh := make(chan struct{ text, url string }, 1)
 	inter := &mockInteractor{approveAll: false, linkCh: linkCh}
-	runner := &mockRunner{outputs: map[string]string{"calendar events.list": `{"items":[]}`}}
+	runner := &mockRunner{outputs: map[string]string{"calendar events list": `{"items":[]}`}}
 
 	waiter := google.NewScopeWaiter()
 	manifest := &skills.Manifest{
@@ -282,7 +282,7 @@ func (c *toggleScopeChecker) HasScopes(_ string, _ []string) (bool, error) {
 
 func TestGWSExecute_KeywordNotWrite(t *testing.T) {
 	tool, inter, runner := setupGWSTest(t, false, nil)
-	runner.outputs["calendar events.delete --id 123"] = "deleted"
+	runner.outputs["calendar events delete --id 123"] = "deleted"
 
 	input, _ := json.Marshal(gwsInput{Command: "calendar events.delete --id 123"})
 	result, err := tool.Execute(context.Background(), input)
@@ -328,7 +328,7 @@ func TestGWSExecute_ScopesForService(t *testing.T) {
 
 func TestGWSExecute_StripGWSPrefix(t *testing.T) {
 	tool, _, runner := setupGWSTest(t, false, nil)
-	runner.outputs["calendar events.list"] = `{"items":[]}`
+	runner.outputs["calendar events list"] = `{"items":[]}`
 
 	input, _ := json.Marshal(gwsInput{Command: "gws calendar events.list"})
 	result, err := tool.Execute(context.Background(), input)
@@ -343,6 +343,28 @@ func TestGWSExecute_StripGWSPrefix(t *testing.T) {
 	}
 	if runner.ran[0].args[0] != "calendar" {
 		t.Errorf("first arg = %q, want 'calendar'", runner.ran[0].args[0])
+	}
+}
+
+func TestExpandDotArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"dot syntax", []string{"drive", "files.list"}, []string{"drive", "files", "list"}},
+		{"already expanded", []string{"drive", "files", "list"}, []string{"drive", "files", "list"}},
+		{"flag not expanded", []string{"drive", "files", "list", "--pageSize", "5"}, []string{"drive", "files", "list", "--pageSize", "5"}},
+		{"mimeType not expanded", []string{"--q", "mimeType='application/vnd.google-apps.document'"}, []string{"--q", "mimeType='application/vnd.google-apps.document'"}},
+		{"url not expanded", []string{"--sanitize", "projects/p/locations/l/templates/t"}, []string{"--sanitize", "projects/p/locations/l/templates/t"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := expandDotArgs(tt.in)
+			if strings.Join(got, " ") != strings.Join(tt.want, " ") {
+				t.Errorf("expandDotArgs(%v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
 	}
 }
 

@@ -96,6 +96,8 @@ func (g *GWSExecuteTool) Execute(ctx context.Context, input json.RawMessage) (st
 	if len(args) > 0 && args[0] == "gws" {
 		args = args[1:]
 	}
+	// Expand dot syntax: LLMs often write "files.list" instead of "files list".
+	args = expandDotArgs(args)
 	service := gwsServiceFromCommand(args)
 	isWrite := g.isWriteCommand(args)
 
@@ -206,6 +208,22 @@ func (g *GWSExecuteTool) scopesForService(service string) []string {
 		}
 	}
 	return nil
+}
+
+// expandDotArgs splits dotted resource.method args into separate args.
+// LLMs often write "files.list" or "events.get" instead of "files list".
+// Only expands non-flag args that look like resource.method (one dot, no slashes).
+func expandDotArgs(args []string) []string {
+	var out []string
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") && strings.Count(a, ".") == 1 && !strings.Contains(a, "/") {
+			parts := strings.SplitN(a, ".", 2)
+			out = append(out, parts...)
+		} else {
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 // gwsServiceFromCommand extracts the service name from gws command args.
