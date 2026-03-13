@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -104,6 +105,12 @@ func (sm *SessionManager) Run(ctx context.Context) {
 }
 
 func (sm *SessionManager) handleMessage(ctx context.Context, text string, messageID int) {
+	if strings.HasPrefix(text, "/start") {
+		sm.endSession()
+		sm.channel.Send("Session reset. Starting fresh.")
+		return
+	}
+
 	sm.touchSession()
 
 	sm.mu.Lock()
@@ -153,14 +160,66 @@ func (sm *SessionManager) handleMessage(ctx context.Context, text string, messag
 	sm.saveHistory(sid, text, response)
 }
 
+func (sm *SessionManager) restoreSession() bool {
+	histDB, err := store.Open(store.Config{
+		Driver: sm.cfg.History.Storage.Driver,
+		DSN:    sm.cfg.HistoryDataDSN(),
+	})
+	if err != nil {
+		slog.Warn("telegram session: open history db for restore", "error", err)
+		return false
+	}
+	defer histDB.Close()
+
+	if err := historysrc.Migrate(histDB); err != nil {
+		slog.Warn("telegram session: migrate history for restore", "error", err)
+		return false
+	}
+
+	recent, err := historysrc.LoadRecentSession(histDB, "telegram", sessionTimeout)
+	if err != nil {
+		slog.Warn("telegram session: load recent session", "error", err)
+		return false
+	}
+	if recent == nil {
+		return false
+	}
+
+	msgs, err := historysrc.LoadSessionMessages(histDB, recent.SessionID, 100)
+	if err != nil {
+		slog.Warn("telegram session: load session messages", "error", err)
+		return false
+	}
+	if len(msgs) == 0 {
+		return false
+	}
+
+	sm.sessionID = recent.SessionID
+	sm.messages = nil
+	sm.history = nil
+	for _, m := range msgs {
+		role := provider.RoleUser
+		if m.Role == "assistant" {
+			role = provider.RoleAssistant
+		}
+		sm.history = append(sm.history, provider.NewTextMessage(role, m.Content))
+		if m.Role == "user" {
+			sm.messages = append(sm.messages, m.Content)
+		}
+	}
+	return true
+}
+
 // touchSession resets the inactivity timer, starting a new session if needed.
 func (sm *SessionManager) touchSession() {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	if sm.sessionID == "" {
-		sm.sessionID = generateSessionID()
-		sm.messages = nil
+		if !sm.restoreSession() {
+			sm.sessionID = generateSessionID()
+			sm.messages = nil
+		}
 	}
 
 	if sm.timer != nil {
@@ -245,6 +304,23 @@ func (sm *SessionManager) buildLLM() (memory.LLM, error) {
 	return &memory.RouterLLM{Router: router, Tier: provider.TierFast}, nil
 }
 
+func (sm *SessionManager) resolveContextWindow() int {
+	if sm.cfg.Models != nil && sm.cfg.Models.ContextWindow > 0 {
+		return sm.cfg.Models.ContextWindow
+	}
+	if w := provider.DefaultContextWindow(sm.model); w > 0 {
+		return w
+	}
+	return 200000
+}
+
+func (sm *SessionManager) resolveCompactionThreshold() float64 {
+	if sm.cfg.Models != nil && sm.cfg.Models.CompactionThreshold > 0 {
+		return sm.cfg.Models.CompactionThreshold
+	}
+	return 0.30
+}
+
 func (sm *SessionManager) gwsEnabled() bool {
 	return sm.cfg.Integrations != nil && sm.cfg.Integrations.GWS != nil && sm.cfg.Integrations.GWS.Enabled
 }
@@ -289,6 +365,12 @@ func (sm *SessionManager) newAgent(history []provider.Message, onToolStart func(
 	if len(history) > 0 {
 		opts = append(opts, agent.WithHistory(history))
 	}
+	opts = append(opts, agent.WithContextWindow(sm.resolveContextWindow()))
+	opts = append(opts, agent.WithCompactionThreshold(sm.resolveCompactionThreshold()))
+	opts = append(opts, agent.WithSummarizer(&agent.LLMSummarizer{
+		Provider: sm.fastProvider,
+		Model:    sm.fastModel,
+	}))
 	recorder := sm.openUsageRecorder()
 	if recorder != nil {
 		opts = append(opts, agent.WithUsageRecorder(recorder))
