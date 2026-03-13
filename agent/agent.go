@@ -115,7 +115,7 @@ func (a *Agent) Run(ctx context.Context, input string) (string, error) {
 	a.history = append(a.history, provider.NewTextMessage(provider.RoleUser, input))
 
 	for i := range a.maxIter {
-		a.compactHistory()
+		a.compactHistory(ctx)
 		if a.rateLimiter != nil {
 			if err := a.rateLimiter.Wait(ctx); err != nil {
 				return "", fmt.Errorf("rate limiter: %w", err)
