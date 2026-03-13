@@ -44,6 +44,10 @@ type SessionManager struct {
 
 	taskTracker *tools.TaskTracker
 
+	webSearch    tools.WebSearcher
+	fastProvider provider.Provider
+	fastModel    string
+
 	mu        sync.Mutex
 	sessionID string
 	timer     *time.Timer
@@ -79,6 +83,7 @@ func NewSessionManager(cfg *config.Config, ch *Channel, p provider.Provider, pro
 	if sm.gwsEnabled() {
 		sm.manifest, _ = skills.LoadManifest()
 	}
+	sm.initWebSearch()
 	return sm
 }
 
@@ -306,7 +311,7 @@ func (sm *SessionManager) registerScheduleTools(reg *tools.Registry) {
 	reg.Register(tools.NewDeleteScheduleTool(deps))
 }
 
-func (sm *SessionManager) registerWebTools(reg *tools.Registry) {
+func (sm *SessionManager) initWebSearch() {
 	var opts []wssrc.Option
 	if err := config.EnsureSourceDir("websearch"); err == nil {
 		db, err := store.Open(store.Config{
@@ -317,40 +322,34 @@ func (sm *SessionManager) registerWebTools(reg *tools.Registry) {
 			opts = append(opts, wssrc.WithDB(db))
 		}
 	}
+	sm.webSearch = wssrc.New(wssrc.Config{WebSearch: sm.cfg.WebSearch}, opts...)
 
-	ws := wssrc.New(wssrc.Config{WebSearch: sm.cfg.WebSearch}, opts...)
-
-	fastP, fastModel := sm.resolveFastProvider()
-	if fastP == nil {
-		fastP = sm.provider
-		fastModel = sm.model
+	if sm.cfg.Models != nil && sm.cfg.Models.Fast != "" {
+		provRegistry, err := provider.NewRegistry(sm.cfg.Models)
+		if err == nil {
+			provName, model, err := provider.ParseModelSpec(sm.cfg.Models.Fast)
+			if err == nil {
+				if p, ok := provRegistry.Get(provName); ok {
+					sm.fastProvider = p
+					sm.fastModel = model
+				}
+			}
+		}
 	}
+	if sm.fastProvider == nil {
+		sm.fastProvider = sm.provider
+		sm.fastModel = sm.model
+	}
+}
+
+func (sm *SessionManager) registerWebTools(reg *tools.Registry) {
 	deps := tools.WebToolDeps{
-		WS:       ws,
-		Provider: fastP,
-		Model:    fastModel,
+		WS:       sm.webSearch,
+		Provider: sm.fastProvider,
+		Model:    sm.fastModel,
 	}
 	reg.Register(tools.NewWebSearchTool(deps))
 	reg.Register(tools.NewWebFetchTool(deps))
-}
-
-func (sm *SessionManager) resolveFastProvider() (provider.Provider, string) {
-	if sm.cfg.Models == nil || sm.cfg.Models.Fast == "" {
-		return nil, ""
-	}
-	provRegistry, err := provider.NewRegistry(sm.cfg.Models)
-	if err != nil {
-		return nil, ""
-	}
-	provName, model, err := provider.ParseModelSpec(sm.cfg.Models.Fast)
-	if err != nil {
-		return nil, ""
-	}
-	p, ok := provRegistry.Get(provName)
-	if !ok {
-		return nil, ""
-	}
-	return p, model
 }
 
 func (sm *SessionManager) registerSlackTools(reg *tools.Registry) {
