@@ -79,5 +79,8 @@ func (s *SubagentTool) Execute(ctx context.Context, input json.RawMessage) (stri
 		agent.WithSystem(s.system),
 		agent.WithMaxIterations(s.maxIter),
 	)
-	return child.Run(ctx, in.Task)
+	out, err := child.Run(ctx, in.Task)
+	out = TruncateHeadTail(out, 500, 500)
+	out = TruncateBytes(out, 50*1024)
+	return out, err
 }

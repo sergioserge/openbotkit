@@ -141,9 +141,12 @@ func (d *DelegateTaskTool) Execute(ctx context.Context, input json.RawMessage) (
 		guardOpts = append(guardOpts, WithApprovalRules(d.approvalRules, "delegate_task", input))
 	}
 
-	return GuardedAction(ctx, d.interactor, RiskHigh, desc, func() (string, error) {
+	out, err := GuardedAction(ctx, d.interactor, RiskHigh, desc, func() (string, error) {
 		return runner.Run(ctx, prompt, d.timeout, runOpts...)
 	}, guardOpts...)
+	out = TruncateHeadTail(out, 500, 500)
+	out = TruncateBytes(out, 50*1024)
+	return out, err
 }
 
 // buildPrompt combines task, steps, and output format into a single prompt.
