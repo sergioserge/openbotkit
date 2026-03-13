@@ -381,6 +381,12 @@ func setupGWS(cfg *config.Config, services []string) error {
 	}
 	fmt.Printf("  Google Workspace authenticated as %s\n", email)
 
+	if cfg.Channels != nil && cfg.Channels.Telegram != nil && cfg.Channels.Telegram.BotToken != "" {
+		if err := setupNgrok(cfg); err != nil {
+			return err
+		}
+	}
+
 	if cfg.Integrations == nil {
 		cfg.Integrations = &config.IntegrationsConfig{}
 	}
