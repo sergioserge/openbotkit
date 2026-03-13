@@ -166,7 +166,9 @@ func (g *GWSExecuteTool) run(ctx context.Context, args []string) (string, error)
 			return "", fmt.Errorf("get token after re-auth: %w", err)
 		}
 	}
-	out, runErr := g.runner.Run(ctx, args, env)
+	runCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	out, runErr := g.runner.Run(runCtx, args, env)
 	out = TruncateHeadTail(out, 500, 500)
 	out = TruncateBytes(out, 50*1024)
 	return out, runErr
