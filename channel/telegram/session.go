@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -104,6 +105,12 @@ func (sm *SessionManager) Run(ctx context.Context) {
 }
 
 func (sm *SessionManager) handleMessage(ctx context.Context, text string) {
+	if strings.HasPrefix(text, "/start") {
+		sm.endSession()
+		sm.channel.Send("Session reset. Starting fresh.")
+		return
+	}
+
 	sm.touchSession()
 
 	sm.mu.Lock()
