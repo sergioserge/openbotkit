@@ -90,33 +90,6 @@ func setupNgrok(cfg *config.Config) error {
 
 	printGoogleConsoleGuide(callbackURL)
 
-	var credPath string
-	err = huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Path to new Web Application credentials.json").
-				Description("Drag and drop the file here, or type the path (leave blank to keep current)").
-				Placeholder(cfg.GoogleCredentialsFile()).
-				Value(&credPath),
-		),
-	).Run()
-	if err != nil {
-		return err
-	}
-	credPath = cleanPath(credPath)
-	if credPath != "" {
-		if _, err := os.Stat(credPath); os.IsNotExist(err) {
-			return fmt.Errorf("credentials file not found: %s", credPath)
-		}
-		if cfg.Providers == nil {
-			cfg.Providers = &config.ProvidersConfig{}
-		}
-		if cfg.Providers.Google == nil {
-			cfg.Providers.Google = &config.GoogleProviderConfig{}
-		}
-		cfg.Providers.Google.CredentialsFile = credPath
-	}
-
 	if cfg.Integrations == nil {
 		cfg.Integrations = &config.IntegrationsConfig{}
 	}
