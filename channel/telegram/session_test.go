@@ -1,11 +1,16 @@
 package telegram
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/provider"
 	historysrc "github.com/priyanshujain/openbotkit/source/history"
 	"github.com/priyanshujain/openbotkit/store"
 )
@@ -123,5 +128,77 @@ func TestRestoreSession_EmptyDB(t *testing.T) {
 	}
 	if len(sm.history) != 0 {
 		t.Fatalf("expected empty history, got %d", len(sm.history))
+	}
+}
+
+func sentTexts(bot *mockBot) []string {
+	bot.mu.Lock()
+	defer bot.mu.Unlock()
+	var texts []string
+	for _, c := range bot.sent {
+		if msg, ok := c.(tgbotapi.MessageConfig); ok {
+			texts = append(texts, msg.Text)
+		}
+	}
+	return texts
+}
+
+func TestStartCommand_ResetsSession(t *testing.T) {
+	cfg := setupTestEnv(t)
+	bot := &mockBot{}
+	ch := NewChannel(bot, 123)
+	sm := &SessionManager{cfg: cfg, channel: ch}
+
+	sm.sessionID = "tg-abc"
+	sm.history = []provider.Message{
+		provider.NewTextMessage(provider.RoleUser, "hello"),
+		provider.NewTextMessage(provider.RoleAssistant, "hi"),
+	}
+	sm.messages = []string{"hello"}
+
+	sm.handleMessage(context.Background(), "/start")
+
+	if sm.sessionID != "" {
+		t.Fatalf("expected cleared sessionID, got %q", sm.sessionID)
+	}
+	if sm.history != nil {
+		t.Fatalf("expected nil history, got %d messages", len(sm.history))
+	}
+
+	texts := sentTexts(bot)
+	found := false
+	for _, txt := range texts {
+		if strings.Contains(txt, "Session reset") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected reset confirmation message, got: %v", texts)
+	}
+}
+
+func TestStartCommand_WithSuffix(t *testing.T) {
+	cfg := setupTestEnv(t)
+	bot := &mockBot{}
+	ch := NewChannel(bot, 123)
+	sm := &SessionManager{cfg: cfg, channel: ch}
+	sm.sessionID = "tg-xyz"
+
+	sm.handleMessage(context.Background(), "/start now")
+
+	if sm.sessionID != "" {
+		t.Fatalf("expected cleared sessionID, got %q", sm.sessionID)
+	}
+	texts := sentTexts(bot)
+	found := false
+	for _, txt := range texts {
+		if strings.Contains(txt, "Session reset") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected reset confirmation, got: %v", texts)
 	}
 }
