@@ -235,8 +235,10 @@ func TestRegistry_FileFallback_DirCreationFails(t *testing.T) {
 	bigOutput := strings.Repeat("x\n", 5000)
 	r := NewRegistry()
 	r.Register(&stubTool{name: "big", output: bigOutput})
-	// Point to an unwritable path.
-	r.SetScratchDir("/proc/nonexistent/scratch")
+	// Create a regular file and use it as parent so MkdirAll fails on all platforms.
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	os.WriteFile(blocker, []byte("x"), 0600)
+	r.SetScratchDir(filepath.Join(blocker, "scratch"))
 
 	output, err := r.Execute(context.Background(), provider.ToolCall{
 		Name: "big", ID: "c5", Input: json.RawMessage(`{}`),
