@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/shlex"
 	"github.com/priyanshujain/openbotkit/internal/skills"
 	"github.com/priyanshujain/openbotkit/oauth/google"
 )
@@ -94,10 +93,7 @@ func (g *GWSExecuteTool) Execute(ctx context.Context, input json.RawMessage) (st
 	}
 
 	slog.Info("gws_execute called", "command", in.Command)
-	args, err := shlex.Split(in.Command)
-	if err != nil {
-		args = strings.Fields(in.Command)
-	}
+	args := splitGWSCommand(in.Command)
 	// Strip leading "gws" if present — skill examples include it but the runner adds it.
 	if len(args) > 0 && args[0] == "gws" {
 		args = args[1:]
@@ -225,6 +221,74 @@ func (g *GWSExecuteTool) scopesForService(service string) []string {
 		}
 	}
 	return nil
+}
+
+// splitGWSCommand splits a gws command string into args, handling --params
+// and --json flags whose values are JSON objects containing spaces and quotes.
+// LLMs often wrap JSON in single quotes (shell convention) which standard
+// splitters cannot handle reliably because the JSON also contains double quotes.
+func splitGWSCommand(cmd string) []string {
+	var args []string
+	cmd = strings.TrimSpace(cmd)
+	for len(cmd) > 0 {
+		if cmd[0] == '\'' || cmd[0] == '{' {
+			// JSON or quoted JSON value — extract using brace matching.
+			s := cmd
+			if s[0] == '\'' {
+				s = s[1:] // skip opening quote
+			}
+			if len(s) > 0 && s[0] == '{' {
+				jsonVal, rest := extractJSONObject(s)
+				args = append(args, jsonVal)
+				rest = strings.TrimLeft(rest, "'") // strip trailing quote
+				cmd = strings.TrimSpace(rest)
+				continue
+			}
+		}
+		// Regular token — read until next whitespace.
+		end := strings.IndexByte(cmd, ' ')
+		if end < 0 {
+			args = append(args, cmd)
+			break
+		}
+		args = append(args, cmd[:end])
+		cmd = strings.TrimSpace(cmd[end:])
+	}
+	return args
+}
+
+// extractJSONObject returns the substring from the opening { to its matching },
+// counting brace depth. It handles braces inside JSON string literals.
+func extractJSONObject(s string) (string, string) {
+	depth := 0
+	inString := false
+	escaped := false
+	for i, c := range s {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if c == '\\' && inString {
+			escaped = true
+			continue
+		}
+		if c == '"' {
+			inString = !inString
+			continue
+		}
+		if inString {
+			continue
+		}
+		if c == '{' {
+			depth++
+		} else if c == '}' {
+			depth--
+			if depth == 0 {
+				return s[:i+1], s[i+1:]
+			}
+		}
+	}
+	return s, ""
 }
 
 // gwsServiceFromCommand extracts the service name from gws command args.
