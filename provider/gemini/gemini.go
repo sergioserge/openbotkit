@@ -95,7 +95,7 @@ func New(apiKey string, opts ...Option) *Gemini {
 	g := &Gemini{
 		apiKey:  apiKey,
 		baseURL: defaultBaseURL,
-		client:  &http.Client{Timeout: 2 * time.Minute},
+		client:  &http.Client{Timeout: 60 * time.Second},
 	}
 	for _, opt := range opts {
 		opt(g)
