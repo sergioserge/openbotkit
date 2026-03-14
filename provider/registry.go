@@ -70,6 +70,11 @@ func NewRegistry(models *config.ModelsConfig) (*Registry, error) {
 	return r, nil
 }
 
+// NewRegistryFromProviders creates a registry from pre-built providers (for testing).
+func NewRegistryFromProviders(providers map[string]Provider) *Registry {
+	return &Registry{providers: providers}
+}
+
 // Get returns the provider with the given name.
 func (r *Registry) Get(name string) (Provider, bool) {
 	p, ok := r.providers[name]
