@@ -3,6 +3,7 @@ package tools
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/priyanshujain/openbotkit/internal/skills"
 	"github.com/priyanshujain/openbotkit/provider"
@@ -58,16 +59,17 @@ The sub-agent has its own tools (bash, file ops, skills) but cannot spawn furthe
 	if reg.Has("gws_execute") {
 		b.WriteString(`
 ## Google Workspace
-Use the gws_execute tool for all Google Workspace operations (Calendar, Drive, Docs, Sheets, Tasks, Contacts).
+Use the gws_execute tool for Google Workspace operations: Calendar, Drive, Docs, Sheets, Tasks, Contacts.
+For Gmail/email operations, use the email-read and email-send skills via the bash tool (obk commands), NOT gws_execute.
 BEFORE your first gws_execute call, ALWAYS use load_skills to load the relevant gws skill for correct command syntax.
 For example, to list files load gws-drive; to read a doc load gws-docs; to check calendar load gws-calendar.
-Tip: listing or searching Google Docs/Sheets/Slides requires gws-drive (files list with mimeType filter), not gws-docs.
 The tool accepts structured input: "command" for the base command, "params" for query parameters (JSON object), and "body" for request bodies (JSON object).
-Example: {"command": "drive files list", "params": {"q": "mimeType='application/vnd.google-apps.document'", "orderBy": "modifiedTime desc", "pageSize": 5}}
 Do NOT put --params or --json in the command string — use the params and body fields instead.
 Do NOT use bash to run gws commands — they will be rejected. Always use gws_execute instead.
 The tool handles authentication, scope checks, and approval for write operations automatically.
 When a tool result includes "user notified", keep your response brief — the user already got the details.
+If a gws_execute call fails, read the error output carefully — it usually contains the correct syntax or hints. Fix the command and retry (up to 3 attempts) before giving up. Common fixes: wrong subcommand name, missing required params, wrong field names in body.
+If the error mentions "API has not been used" or "SERVICE_DISABLED", extract the activation URL from the error and share it with the user so they can enable the API.
 `)
 	}
 
@@ -75,11 +77,9 @@ When a tool result includes "user notified", keep your response brief — the us
 	if reg.Has("delegate_task") {
 		b.WriteString(`
 ## Task Delegation
-Use delegate_task for complex tasks: research, analysis, code generation.
-For multi-step workflows, provide steps in the spec — they execute as a single agent run.
-Set async=true for tasks taking more than a minute. You'll be notified of progress periodically.
-Use check_task to retrieve results, then deliver them using other tools (gws_execute for Google Docs, slack_send for Slack, etc.).
-Example workflow: delegate research → check_task → gws_execute to create doc → slack_send to share link.
+Use delegate_task for research, analysis, code generation, or any multi-step task.
+Results are saved to a file — use file_read to review, then deliver using your tools.
+Never paste raw delegation results — always create the requested deliverable.
 `)
 	}
 
@@ -151,8 +151,10 @@ func BuildSystemBlocks(identity string, reg *Registry, extras ...string) []provi
 	blocks := []provider.SystemBlock{
 		{Text: base, CacheControl: &provider.CacheControl{Type: "ephemeral"}},
 	}
-	if extra := strings.Join(extras, ""); extra != "" {
-		blocks = append(blocks, provider.SystemBlock{Text: extra})
-	}
+	// Current date/time goes in the dynamic (non-cacheable) block.
+	now := time.Now()
+	dateStr := "\nCurrent date and time: " + now.Format("January 2, 2006 3:04 PM (MST)") + "\n"
+	extra := dateStr + strings.Join(extras, "")
+	blocks = append(blocks, provider.SystemBlock{Text: extra})
 	return blocks
 }

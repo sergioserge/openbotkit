@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,8 +54,10 @@ func setupGWSTest(t *testing.T, approveAll bool, scopes map[string]bool) (*GWSEx
 
 	manifest := &skills.Manifest{
 		Skills: map[string]skills.SkillEntry{
-			"gws-calendar-list": {Source: "gws", Scopes: []string{"calendar"}, Write: false},
-			"gws-calendar-edit": {Source: "gws", Scopes: []string{"calendar"}, Write: true},
+			"gws-calendar-list":   {Source: "gws", Scopes: []string{"calendar"}, Write: false},
+			"gws-calendar-edit":   {Source: "gws", Scopes: []string{"calendar"}, Write: true},
+			"gws-calendar-agenda": {Source: "gws", Scopes: []string{"calendar"}, Write: false},
+			"gws-calendar-insert": {Source: "gws", Scopes: []string{"calendar"}, Write: true},
 		},
 	}
 
@@ -280,6 +283,23 @@ func (c *toggleScopeChecker) HasScopes(_ string, _ []string) (bool, error) {
 	return c.hasAfterSignal, nil
 }
 
+func TestGWSExecute_ReadOnlyHelperNotWrite(t *testing.T) {
+	tool, inter, runner := setupGWSTest(t, false, nil)
+	runner.outputs["calendar +agenda"] = `{"events":[]}`
+
+	input, _ := json.Marshal(gwsInput{Command: "calendar +agenda"})
+	result, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result != `{"events":[]}` {
+		t.Errorf("result = %q", result)
+	}
+	if len(inter.approvals) > 0 {
+		t.Error("+agenda is read-only, should not trigger approval")
+	}
+}
+
 func TestGWSExecute_KeywordNotWrite(t *testing.T) {
 	tool, inter, runner := setupGWSTest(t, false, nil)
 	runner.outputs["calendar events delete --id 123"] = "deleted"
@@ -300,7 +320,7 @@ func TestGWSExecute_KeywordNotWrite(t *testing.T) {
 func TestGWSExecute_ScopesForService(t *testing.T) {
 	manifest := &skills.Manifest{
 		Skills: map[string]skills.SkillEntry{
-			"gws-docs-read": {Source: "gws", Scopes: []string{"docs"}},
+			"gws-docs-read":  {Source: "gws", Scopes: []string{"docs"}},
 			"gws-drive-list": {Source: "gws", Scopes: []string{"drive"}},
 		},
 	}
@@ -312,6 +332,8 @@ func TestGWSExecute_ScopesForService(t *testing.T) {
 	}{
 		{"docs", "https://www.googleapis.com/auth/documents"},
 		{"drive", "https://www.googleapis.com/auth/drive"},
+		// gmail has no manifest entry but exists in serviceToScope — fallback works.
+		{"gmail", "https://www.googleapis.com/auth/gmail.modify"},
 		{"unknown", ""},
 	}
 	for _, tt := range tests {
@@ -347,7 +369,10 @@ func TestGWSExecute_StripGWSPrefix(t *testing.T) {
 }
 
 func TestGWSExecute_StructuredParams(t *testing.T) {
-	tool, _, runner := setupGWSTest(t, false, nil)
+	tool, _, runner := setupGWSTest(t, false, map[string]bool{
+		"https://www.googleapis.com/auth/calendar": true,
+		"https://www.googleapis.com/auth/drive":    true,
+	})
 	runner.outputs[`drive files list --params {"orderBy":"modifiedTime desc","pageSize":5,"q":"mimeType='application/vnd.google-apps.document'"}`] = `{"files":[]}`
 
 	input, _ := json.Marshal(map[string]any{
@@ -549,6 +574,148 @@ func TestGWSExecute_Name(t *testing.T) {
 	}
 	if !json.Valid(tool.InputSchema()) {
 		t.Error("invalid input schema")
+	}
+}
+
+func TestGWSExecute_ServiceDisabledAnnotation(t *testing.T) {
+	tool, inter, runner := setupGWSTest(t, false, nil)
+
+	apiError := `{"error":{"code":403,"message":"Google Calendar API has not been used in project 123456 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=123456 then retry.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com"}]}}`
+	runner.outputs["calendar events list"] = apiError
+	runner.errs = map[string]error{"calendar events list": fmt.Errorf("exit status 1")}
+
+	input, _ := json.Marshal(gwsInput{Command: "calendar events list"})
+	result, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error for disabled API")
+	}
+	if !strings.Contains(result, "SERVICE_DISABLED") {
+		t.Error("result should contain original SERVICE_DISABLED error")
+	}
+	if !strings.Contains(result, "console.developers.google.com") {
+		t.Error("result should preserve the activation URL")
+	}
+	if !strings.Contains(result, "The Google API for this service is not enabled") {
+		t.Error("result should contain annotation note")
+	}
+	// No re-auth should be triggered (re-auth can't fix a disabled API).
+	if len(inter.links) > 0 {
+		t.Error("SERVICE_DISABLED should not trigger re-auth")
+	}
+	// Command should only run once (no retry).
+	if len(runner.ran) != 1 {
+		t.Errorf("expected 1 run, got %d", len(runner.ran))
+	}
+}
+
+// scopeRetryRunner fails with ACCESS_TOKEN_SCOPE_INSUFFICIENT on first call,
+// then succeeds on retry.
+type scopeRetryRunner struct {
+	calls int
+	ran   []struct{ args, env []string }
+}
+
+func (r *scopeRetryRunner) Run(_ context.Context, args []string, env []string) (string, error) {
+	r.ran = append(r.ran, struct{ args, env []string }{args, env})
+	r.calls++
+	if r.calls == 1 {
+		return `{"error":{"code":403,"status":"PERMISSION_DENIED","details":[{"reason":"ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}`, fmt.Errorf("exit status 1")
+	}
+	return `{"items":[]}`, nil
+}
+
+func TestGWSExecute_ScopeInsufficientRetry(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "tokens.db")
+	credPath := writeTestCreds(t, dir)
+
+	store, err := google.NewTokenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok := &oauth2.Token{
+		AccessToken:  "test-token",
+		RefreshToken: "test-refresh",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}
+	if err := store.SaveToken("user@test.com", tok, []string{"openid", "email", "calendar"}); err != nil {
+		t.Fatal(err)
+	}
+	store.Close()
+
+	g := google.New(google.Config{
+		CredentialsFile: credPath,
+		TokenDBPath:     dbPath,
+	})
+	bridge := NewTokenBridge(g, "user@test.com")
+	linkCh := make(chan struct{ text, url string }, 1)
+	inter := &mockInteractor{approveAll: false, linkCh: linkCh}
+	runner := &scopeRetryRunner{}
+
+	waiter := google.NewScopeWaiter()
+	checker := &mockScopeChecker{scopes: map[string]bool{
+		"https://www.googleapis.com/auth/calendar": true,
+	}}
+
+	tool := NewGWSExecuteTool(GWSToolConfig{
+		Interactor:   inter,
+		ScopeChecker: checker,
+		Bridge:       bridge,
+		ScopeWaiter:  waiter,
+		Google:       g,
+		Account:      "user@test.com",
+		Manifest: &skills.Manifest{
+			Skills: map[string]skills.SkillEntry{
+				"gws-calendar-list": {Source: "gws", Scopes: []string{"calendar"}},
+			},
+		},
+		Runner:      runner,
+		AuthTimeout: 5 * time.Second,
+	})
+
+	done := make(chan struct{})
+	var result string
+	var execErr error
+	go func() {
+		input, _ := json.Marshal(gwsInput{Command: "calendar events list"})
+		result, execErr = tool.Execute(context.Background(), input)
+		close(done)
+	}()
+
+	// Wait for the re-auth link triggered by scope insufficient.
+	var link struct{ text, url string }
+	select {
+	case link = <-linkCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for re-auth link")
+	}
+
+	// Extract state and signal success.
+	stateIdx := strings.Index(link.url, "state=")
+	if stateIdx < 0 {
+		t.Fatal("auth link missing state param")
+	}
+	state := link.url[stateIdx+6:]
+	if ampIdx := strings.Index(state, "&"); ampIdx >= 0 {
+		state = state[:ampIdx]
+	}
+	waiter.Signal(state, nil)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for execute")
+	}
+
+	if execErr != nil {
+		t.Fatalf("Execute: %v", execErr)
+	}
+	if result != `{"items":[]}` {
+		t.Errorf("result = %q", result)
+	}
+	if runner.calls != 2 {
+		t.Errorf("expected 2 runner calls (fail + retry), got %d", runner.calls)
 	}
 }
 

@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS history_conversations (
 	session_id TEXT NOT NULL UNIQUE,
 	cwd TEXT,
 	started_at DATETIME,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	ended_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS history_messages (
@@ -30,7 +31,8 @@ CREATE TABLE IF NOT EXISTS history_conversations (
 	session_id TEXT NOT NULL UNIQUE,
 	cwd TEXT,
 	started_at TIMESTAMPTZ,
-	updated_at TIMESTAMPTZ DEFAULT NOW()
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	ended_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS history_messages (

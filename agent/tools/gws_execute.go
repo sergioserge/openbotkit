@@ -169,6 +169,32 @@ func (g *GWSExecuteTool) run(ctx context.Context, args []string) (string, error)
 	runCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	out, runErr := g.runner.Run(runCtx, args, env)
+
+	// If Google returns insufficient scopes, the local DB is stale.
+	// Trigger progressive consent and retry once.
+	if runErr != nil && strings.Contains(out, "ACCESS_TOKEN_SCOPE_INSUFFICIENT") {
+		slog.Warn("gws_execute: scope insufficient, triggering re-auth")
+		service := gwsServiceFromCommand(args)
+		scopes := g.scopesForService(service)
+		if len(scopes) > 0 {
+			if cerr := g.requestConsent(ctx, scopes); cerr == nil {
+				env, err = g.bridge.Env(ctx)
+				if err == nil {
+					retryCtx, retryCancel := context.WithTimeout(ctx, 30*time.Second)
+					defer retryCancel()
+					out, runErr = g.runner.Run(retryCtx, args, env)
+				}
+			}
+		}
+	}
+
+	// If the API is disabled, flag it so the agent can extract the
+	// enablement URL from the error and share it with the user.
+	if runErr != nil && (strings.Contains(out, "SERVICE_DISABLED") || strings.Contains(out, "API has not been used")) {
+		slog.Warn("gws_execute: API disabled for service", "service", gwsServiceFromCommand(args))
+		out = out + "\n\nNote: The Google API for this service is not enabled. The error above contains an activation URL — share it with the user so they can enable the API."
+	}
+
 	out = TruncateHeadTail(out, MaxLinesHeadTail, MaxLinesHeadTail)
 	out = TruncateBytes(out, MaxOutputBytes)
 	return out, runErr
@@ -211,9 +237,19 @@ func (g *GWSExecuteTool) requestConsent(ctx context.Context, scopes []string) er
 }
 
 func (g *GWSExecuteTool) isWriteCommand(args []string) bool {
+	if g.manifest == nil {
+		return false
+	}
+	// Build the expected skill name from the command args.
+	// e.g. ["calendar", "+agenda"] → "gws-calendar-agenda"
+	service := gwsServiceFromCommand(args)
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "+") {
-			return true
+		if sub, ok := strings.CutPrefix(arg, "+"); ok {
+			skillName := "gws-" + service + "-" + sub
+			if entry, ok := g.manifest.Skills[skillName]; ok {
+				return entry.Write
+			}
+			return true // unknown + command, assume write to be safe
 		}
 	}
 	return false
@@ -227,20 +263,24 @@ var serviceToScope = map[string]string{
 	"sheets":   "https://www.googleapis.com/auth/spreadsheets",
 	"tasks":    "https://www.googleapis.com/auth/tasks",
 	"people":   "https://www.googleapis.com/auth/contacts",
+	"gmail":    "https://www.googleapis.com/auth/gmail.modify",
 }
 
 func (g *GWSExecuteTool) scopesForService(service string) []string {
-	if g.manifest == nil {
-		return nil
-	}
-	for _, entry := range g.manifest.Skills {
-		if entry.Source == "gws" && len(entry.Scopes) > 0 && entry.Scopes[0] == service {
-			scope, ok := serviceToScope[service]
-			if !ok {
-				return nil
+	// Check manifest for GWS skills first.
+	if g.manifest != nil {
+		for _, entry := range g.manifest.Skills {
+			if entry.Source == "gws" && len(entry.Scopes) > 0 && entry.Scopes[0] == service {
+				if scope, ok := serviceToScope[service]; ok {
+					return []string{scope}
+				}
 			}
-			return []string{scope}
 		}
+	}
+	// Fall back to the scope map directly so progressive consent works
+	// even for services without a GWS-generated skill (e.g. gmail).
+	if scope, ok := serviceToScope[service]; ok {
+		return []string{scope}
 	}
 	return nil
 }

@@ -9,6 +9,12 @@
   - Keep code simple and easy to read.
   - Avoid excessive comments — only comment when absolutely necessary.
 
+## Destructive Actions
+
+  - NEVER delete databases, config files, or user data. If a schema changes, rename/migrate in place.
+  - Always prefer non-destructive alternatives (ALTER TABLE RENAME, mv, cp) over delete-and-recreate.
+  - Ask before removing any file that contains user data.
+
 ## Git Branch Rules
 
   - No slashes in branch names (e.g., use `fix-something` not `fix/something`).

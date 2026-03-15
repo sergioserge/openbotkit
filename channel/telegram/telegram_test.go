@@ -192,7 +192,7 @@ func TestRequestApproval_SendsKeyboard(t *testing.T) {
 	}
 
 	// Simulate approve callback
-	ch.HandleCallback("approve")
+	ch.HandleCallback("cb123", "approve")
 
 	approved := <-done
 	if !approved {
@@ -232,6 +232,95 @@ func TestOwnerFilter_RejectsNonOwner(t *testing.T) {
 	}
 	if msg.text != "hello owner" {
 		t.Fatalf("expected 'hello owner', got %q", msg.text)
+	}
+}
+
+func TestHandleCallback_AnswersQueryAndRemovesButtons(t *testing.T) {
+	bot := &mockBot{notify: make(chan struct{}, 1)}
+	ch := NewChannel(bot, 123)
+
+	done := make(chan bool, 1)
+	go func() {
+		approved, _ := ch.RequestApproval("delete files")
+		done <- approved
+	}()
+
+	// Wait for approval message to be sent.
+	select {
+	case <-bot.notify:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for approval message")
+	}
+
+	ch.HandleCallback("cb456", "approve")
+
+	approved := <-done
+	if !approved {
+		t.Fatal("expected approval")
+	}
+
+	bot.mu.Lock()
+	defer bot.mu.Unlock()
+
+	// Should have received callback answer and edit message via Request().
+	if len(bot.requests) < 2 {
+		t.Fatalf("expected at least 2 requests (callback answer + edit), got %d", len(bot.requests))
+	}
+
+	// First request: callback answer.
+	cb, ok := bot.requests[0].(tgbotapi.CallbackConfig)
+	if !ok {
+		t.Fatalf("expected CallbackConfig, got %T", bot.requests[0])
+	}
+	if cb.CallbackQueryID != "cb456" {
+		t.Errorf("callback query ID = %q, want %q", cb.CallbackQueryID, "cb456")
+	}
+	if cb.Text != "Approved" {
+		t.Errorf("callback text = %q, want %q", cb.Text, "Approved")
+	}
+
+	// Second request: edit message to remove buttons.
+	edit, ok := bot.requests[1].(tgbotapi.EditMessageReplyMarkupConfig)
+	if !ok {
+		t.Fatalf("expected EditMessageReplyMarkupConfig, got %T", bot.requests[1])
+	}
+	if len(edit.ReplyMarkup.InlineKeyboard) != 0 {
+		t.Error("expected empty keyboard (buttons removed)")
+	}
+}
+
+func TestHandleCallback_DenyShowsDeniedLabel(t *testing.T) {
+	bot := &mockBot{notify: make(chan struct{}, 1)}
+	ch := NewChannel(bot, 123)
+
+	done := make(chan bool, 1)
+	go func() {
+		approved, _ := ch.RequestApproval("risky action")
+		done <- approved
+	}()
+
+	select {
+	case <-bot.notify:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for approval message")
+	}
+
+	ch.HandleCallback("cb789", "deny")
+
+	approved := <-done
+	if approved {
+		t.Fatal("expected denial")
+	}
+
+	bot.mu.Lock()
+	defer bot.mu.Unlock()
+
+	cb, ok := bot.requests[0].(tgbotapi.CallbackConfig)
+	if !ok {
+		t.Fatalf("expected CallbackConfig, got %T", bot.requests[0])
+	}
+	if cb.Text != "Denied" {
+		t.Errorf("callback text = %q, want %q", cb.Text, "Denied")
 	}
 }
 

@@ -51,6 +51,11 @@ var defaultTimings = feedbackTimings{
 	ackDelayMax:    12 * time.Second,
 }
 
+type toolSignal struct {
+	name string
+	done chan struct{}
+}
+
 type processingFeedback struct {
 	bot       botSender
 	chatID    int64
@@ -62,7 +67,7 @@ type processingFeedback struct {
 
 	cancel   context.CancelFunc
 	done     chan struct{}
-	signalCh chan string
+	signalCh chan toolSignal
 	acked    atomic.Bool
 }
 
@@ -76,7 +81,7 @@ func newProcessingFeedback(bot botSender, chatID int64, messageID int, userText 
 		model:     model,
 		timings:   defaultTimings,
 		done:      make(chan struct{}),
-		signalCh:  make(chan string, 1),
+		signalCh:  make(chan toolSignal, 1),
 	}
 }
 
@@ -92,8 +97,13 @@ func (f *processingFeedback) Signal(toolName string) {
 	if !slowTools[toolName] {
 		return
 	}
+	done := make(chan struct{})
 	select {
-	case f.signalCh <- toolName:
+	case f.signalCh <- toolSignal{name: toolName, done: done}:
+		select {
+		case <-done:
+		case <-f.done:
+		}
 	default:
 	}
 }
@@ -121,13 +131,17 @@ func (f *processingFeedback) loop(ctx context.Context) {
 			return
 		case <-typingTicker.C:
 			f.sendTyping()
-		case toolName := <-f.signalCh:
+		case sig := <-f.signalCh:
 			if f.acked.Load() {
+				close(sig.done)
 				continue
 			}
 			f.acked.Store(true)
 			ackTimer.Stop()
-			go f.sendToolAck(ctx, toolName)
+			go func() {
+				f.sendToolAck(ctx, sig.name)
+				close(sig.done)
+			}()
 		case <-ackTimer.C:
 			if f.acked.Load() {
 				continue

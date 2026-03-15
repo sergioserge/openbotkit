@@ -148,6 +148,11 @@ func (sm *SessionManager) handleMessage(ctx context.Context, text string, messag
 		return
 	}
 
+	if strings.TrimSpace(response) == "" {
+		slog.Warn("telegram session: empty response from agent")
+		response = "I wasn't able to generate a response. Could you try again?"
+	}
+
 	if err := sm.channel.Send(response); err != nil {
 		slog.Error("telegram session: send response", "error", err)
 	}
@@ -256,6 +261,15 @@ func (sm *SessionManager) endSession() {
 	sm.mu.Unlock()
 
 	config.CleanScratch(sid)
+
+	// Mark session ended in DB so restoreSession won't revive it.
+	if histDB, err := store.Open(store.Config{
+		Driver: sm.cfg.History.Storage.Driver,
+		DSN:    sm.cfg.HistoryDataDSN(),
+	}); err == nil {
+		historysrc.EndSession(histDB, sid)
+		histDB.Close()
+	}
 
 	if len(messages) > 0 {
 		go sm.extractMemories(context.Background(), messages)
@@ -386,8 +400,14 @@ func (sm *SessionManager) newAgent(history []provider.Message, onToolStart func(
 		System: "You are a focused sub-agent. Complete the given task and return a concise result.",
 	}))
 
-	identity := "You are a personal AI assistant powered by OpenBotKit, communicating via Telegram.\n"
-	extras := "\nBe concise and direct. Skip filler phrases.\n" + sm.userMemoriesPrompt()
+	identity := "You are a personal AI assistant communicating via Telegram.\n"
+	extras := `
+Talk like a helpful human, not a robot. Be casual, warm, and direct.
+- Answer the question first. Don't restate what the user already knows (like today's date).
+- Keep it short — one or two sentences when possible.
+- Summarize by default, but include specifics when the user asks for details.
+- Use natural language, not structured output. Say "you're free after 2" not "you have availability from 14:00-17:00".
+` + sm.userMemoriesPrompt()
 	blocks := tools.BuildSystemBlocks(identity, toolReg, extras)
 
 	opts := []agent.Option{agent.WithSystemBlocks(blocks)}
@@ -416,10 +436,14 @@ func (sm *SessionManager) registerDelegateTool(reg *tools.Registry) {
 	if len(agents) == 0 || sm.interactor == nil {
 		return
 	}
+	sm.mu.Lock()
+	delegateSID := sm.sessionID
+	sm.mu.Unlock()
 	reg.Register(tools.NewDelegateTaskTool(tools.DelegateTaskConfig{
 		Interactor: sm.interactor,
 		Agents:     agents,
 		Tracker:    sm.taskTracker,
+		ScratchDir: config.ScratchDir(delegateSID),
 	}))
 	reg.Register(tools.NewCheckTaskTool(sm.taskTracker))
 }
