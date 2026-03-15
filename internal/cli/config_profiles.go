@@ -145,7 +145,7 @@ var configProfilesCreateCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
-		fmt.Println("\n  Create a custom model profile\n")
+		fmt.Print("\n  Create a custom model profile\n\n")
 
 		// Profile name.
 		var name string
