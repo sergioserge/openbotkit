@@ -169,6 +169,25 @@ func (g *GWSExecuteTool) run(ctx context.Context, args []string) (string, error)
 	runCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	out, runErr := g.runner.Run(runCtx, args, env)
+
+	// If Google returns insufficient scopes, the local DB is stale.
+	// Trigger progressive consent and retry once.
+	if runErr != nil && strings.Contains(out, "ACCESS_TOKEN_SCOPE_INSUFFICIENT") {
+		slog.Warn("gws_execute: scope insufficient, triggering re-auth")
+		service := gwsServiceFromCommand(args)
+		scopes := g.scopesForService(service)
+		if len(scopes) > 0 {
+			if cerr := g.requestConsent(ctx, scopes); cerr == nil {
+				env, err = g.bridge.Env(ctx)
+				if err == nil {
+					retryCtx, retryCancel := context.WithTimeout(ctx, 30*time.Second)
+					defer retryCancel()
+					out, runErr = g.runner.Run(retryCtx, args, env)
+				}
+			}
+		}
+	}
+
 	out = TruncateHeadTail(out, MaxLinesHeadTail, MaxLinesHeadTail)
 	out = TruncateBytes(out, MaxOutputBytes)
 	return out, runErr
