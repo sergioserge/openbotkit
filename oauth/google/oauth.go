@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -116,12 +117,15 @@ func fetchUserEmail(ctx context.Context, httpClient *http.Client) (string, error
 	return info.Email, nil
 }
 
-func openBrowser(url string) error {
+func openBrowser(u string) error {
+	if !strings.HasPrefix(u, "https://") {
+		return fmt.Errorf("refusing to open non-HTTPS URL")
+	}
 	switch runtime.GOOS {
 	case "darwin":
-		return exec.Command("open", url).Start()
+		return exec.Command("open", u).Start()
 	case "linux":
-		return exec.Command("xdg-open", url).Start()
+		return exec.Command("xdg-open", u).Start()
 	default:
 		return fmt.Errorf("unsupported platform")
 	}
