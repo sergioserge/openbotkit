@@ -90,17 +90,7 @@ var configProfilesShowCmd = &cobra.Command{
 			} else {
 				category = fmt.Sprintf("multi (%d API keys)", len(p.Providers))
 			}
-			fmt.Printf("Name:        %s\n", p.Name)
-			fmt.Printf("Label:       %s\n", p.Label)
-			fmt.Printf("Description: %s\n", p.Description)
-			fmt.Printf("Category:    %s\n", category)
-			fmt.Printf("Providers:   %s\n", strings.Join(p.Providers, ", "))
-			fmt.Println()
-			fmt.Println("Tiers:")
-			fmt.Printf("  Default: %s\n", p.Tiers.Default)
-			fmt.Printf("  Complex: %s\n", p.Tiers.Complex)
-			fmt.Printf("  Fast:    %s\n", p.Tiers.Fast)
-			fmt.Printf("  Nano:    %s\n", p.Tiers.Nano)
+			printProfileDetails(name, p.Label, p.Description, category, p.Providers, p.Tiers)
 			return nil
 		}
 
@@ -115,25 +105,29 @@ var configProfilesShowCmd = &cobra.Command{
 				if label == "" {
 					label = name
 				}
-				fmt.Printf("Name:        %s\n", name)
-				fmt.Printf("Label:       %s\n", label)
-				if cp.Description != "" {
-					fmt.Printf("Description: %s\n", cp.Description)
-				}
-				fmt.Printf("Category:    custom\n")
-				fmt.Printf("Providers:   %s\n", strings.Join(cp.Providers, ", "))
-				fmt.Println()
-				fmt.Println("Tiers:")
-				fmt.Printf("  Default: %s\n", cp.Tiers.Default)
-				fmt.Printf("  Complex: %s\n", cp.Tiers.Complex)
-				fmt.Printf("  Fast:    %s\n", cp.Tiers.Fast)
-				fmt.Printf("  Nano:    %s\n", cp.Tiers.Nano)
+				printProfileDetails(name, label, cp.Description, "custom", cp.Providers, cp.Tiers)
 				return nil
 			}
 		}
 
 		return fmt.Errorf("profile %q not found", name)
 	},
+}
+
+func printProfileDetails(name, label, description, category string, providers []string, tiers config.ProfileTiers) {
+	fmt.Printf("Name:        %s\n", name)
+	fmt.Printf("Label:       %s\n", label)
+	if description != "" {
+		fmt.Printf("Description: %s\n", description)
+	}
+	fmt.Printf("Category:    %s\n", category)
+	fmt.Printf("Providers:   %s\n", strings.Join(providers, ", "))
+	fmt.Println()
+	fmt.Println("Tiers:")
+	fmt.Printf("  Default: %s\n", tiers.Default)
+	fmt.Printf("  Complex: %s\n", tiers.Complex)
+	fmt.Printf("  Fast:    %s\n", tiers.Fast)
+	fmt.Printf("  Nano:    %s\n", tiers.Nano)
 }
 
 var configProfilesCreateCmd = &cobra.Command{
