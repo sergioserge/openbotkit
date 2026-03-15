@@ -378,8 +378,8 @@ func TestBuildSystemBlocks_BaseOnly(t *testing.T) {
 	reg.Register(&stubTool{name: "bash"})
 
 	blocks := BuildSystemBlocks("You are an AI.\n", reg)
-	if len(blocks) != 1 {
-		t.Fatalf("got %d blocks, want 1", len(blocks))
+	if len(blocks) != 2 {
+		t.Fatalf("got %d blocks, want 2", len(blocks))
 	}
 	if blocks[0].CacheControl == nil || blocks[0].CacheControl.Type != "ephemeral" {
 		t.Error("base block should have ephemeral cache_control")
@@ -389,6 +389,9 @@ func TestBuildSystemBlocks_BaseOnly(t *testing.T) {
 	}
 	if !strings.Contains(blocks[0].Text, "bash") {
 		t.Error("base block should contain tool names")
+	}
+	if !strings.Contains(blocks[1].Text, "Today's date:") {
+		t.Error("extras block should contain today's date")
 	}
 }
 
@@ -403,8 +406,11 @@ func TestBuildSystemBlocks_WithExtras(t *testing.T) {
 	if blocks[1].CacheControl != nil {
 		t.Error("extras block should not have cache_control")
 	}
-	if blocks[1].Text != "\nBe concise.\nUser likes Go." {
-		t.Errorf("extras text = %q", blocks[1].Text)
+	if !strings.Contains(blocks[1].Text, "Today's date:") {
+		t.Error("extras block should contain today's date")
+	}
+	if !strings.Contains(blocks[1].Text, "Be concise.") || !strings.Contains(blocks[1].Text, "User likes Go.") {
+		t.Errorf("extras block should contain caller extras, got %q", blocks[1].Text)
 	}
 }
 

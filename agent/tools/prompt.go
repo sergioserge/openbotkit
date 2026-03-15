@@ -3,6 +3,7 @@ package tools
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/priyanshujain/openbotkit/internal/skills"
 	"github.com/priyanshujain/openbotkit/provider"
@@ -154,8 +155,9 @@ func BuildSystemBlocks(identity string, reg *Registry, extras ...string) []provi
 	blocks := []provider.SystemBlock{
 		{Text: base, CacheControl: &provider.CacheControl{Type: "ephemeral"}},
 	}
-	if extra := strings.Join(extras, ""); extra != "" {
-		blocks = append(blocks, provider.SystemBlock{Text: extra})
-	}
+	// Current date goes in the dynamic (non-cacheable) block.
+	dateStr := "\nToday's date: " + time.Now().Format("January 2, 2006") + "\n"
+	extra := dateStr + strings.Join(extras, "")
+	blocks = append(blocks, provider.SystemBlock{Text: extra})
 	return blocks
 }
