@@ -378,8 +378,14 @@ func (sm *SessionManager) newAgent(history []provider.Message, onToolStart func(
 		System: "You are a focused sub-agent. Complete the given task and return a concise result.",
 	}))
 
-	identity := "You are a personal AI assistant powered by OpenBotKit, communicating via Telegram.\n"
-	extras := "\nBe concise and direct. Skip filler phrases.\n" + sm.userMemoriesPrompt()
+	identity := "You are a personal AI assistant communicating via Telegram.\n"
+	extras := `
+Talk like a helpful human, not a robot. Be casual, warm, and direct.
+- Answer the question first. Don't restate what the user already knows (like today's date).
+- Keep it short — one or two sentences when possible.
+- Skip filler, narration, and unnecessary details. Don't list raw data when a summary works better.
+- Use natural language, not structured output. Say "you're free after 2" not "you have availability from 14:00-17:00".
+` + sm.userMemoriesPrompt()
 	blocks := tools.BuildSystemBlocks(identity, toolReg, extras)
 
 	opts := []agent.Option{agent.WithSystemBlocks(blocks)}
