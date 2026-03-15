@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"runtime"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -65,7 +67,10 @@ func getTokenViaCallback(config *oauth2.Config, authOpts ...oauth2.AuthCodeOptio
 
 	opts := append([]oauth2.AuthCodeOption{oauth2.AccessTypeOffline}, authOpts...)
 	authURL := config.AuthCodeURL("state-token", opts...)
-	fmt.Printf("\nOpen this URL in your browser to authorize:\n%s\n\n", authURL)
+	fmt.Printf("\nOpening browser to authorize...\n")
+	if err := openBrowser(authURL); err != nil {
+		fmt.Printf("Could not open browser automatically. Open this URL:\n%s\n\n", authURL)
+	}
 
 	var code string
 	select {
@@ -109,6 +114,17 @@ func fetchUserEmail(ctx context.Context, httpClient *http.Client) (string, error
 		return "", fmt.Errorf("userinfo response missing email")
 	}
 	return info.Email, nil
+}
+
+func openBrowser(url string) error {
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", url).Start()
+	case "linux":
+		return exec.Command("xdg-open", url).Start()
+	default:
+		return fmt.Errorf("unsupported platform")
+	}
 }
 
 // mergeScopes combines two scope lists, deduplicating.
