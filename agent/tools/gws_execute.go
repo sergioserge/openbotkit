@@ -227,20 +227,24 @@ var serviceToScope = map[string]string{
 	"sheets":   "https://www.googleapis.com/auth/spreadsheets",
 	"tasks":    "https://www.googleapis.com/auth/tasks",
 	"people":   "https://www.googleapis.com/auth/contacts",
+	"gmail":    "https://www.googleapis.com/auth/gmail.modify",
 }
 
 func (g *GWSExecuteTool) scopesForService(service string) []string {
-	if g.manifest == nil {
-		return nil
-	}
-	for _, entry := range g.manifest.Skills {
-		if entry.Source == "gws" && len(entry.Scopes) > 0 && entry.Scopes[0] == service {
-			scope, ok := serviceToScope[service]
-			if !ok {
-				return nil
+	// Check manifest for GWS skills first.
+	if g.manifest != nil {
+		for _, entry := range g.manifest.Skills {
+			if entry.Source == "gws" && len(entry.Scopes) > 0 && entry.Scopes[0] == service {
+				if scope, ok := serviceToScope[service]; ok {
+					return []string{scope}
+				}
 			}
-			return []string{scope}
 		}
+	}
+	// Fall back to the scope map directly so progressive consent works
+	// even for services without a GWS-generated skill (e.g. gmail).
+	if scope, ok := serviceToScope[service]; ok {
+		return []string{scope}
 	}
 	return nil
 }

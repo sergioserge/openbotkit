@@ -300,7 +300,7 @@ func TestGWSExecute_KeywordNotWrite(t *testing.T) {
 func TestGWSExecute_ScopesForService(t *testing.T) {
 	manifest := &skills.Manifest{
 		Skills: map[string]skills.SkillEntry{
-			"gws-docs-read": {Source: "gws", Scopes: []string{"docs"}},
+			"gws-docs-read":  {Source: "gws", Scopes: []string{"docs"}},
 			"gws-drive-list": {Source: "gws", Scopes: []string{"drive"}},
 		},
 	}
@@ -312,6 +312,8 @@ func TestGWSExecute_ScopesForService(t *testing.T) {
 	}{
 		{"docs", "https://www.googleapis.com/auth/documents"},
 		{"drive", "https://www.googleapis.com/auth/drive"},
+		// gmail has no manifest entry but exists in serviceToScope — fallback works.
+		{"gmail", "https://www.googleapis.com/auth/gmail.modify"},
 		{"unknown", ""},
 	}
 	for _, tt := range tests {
@@ -347,7 +349,10 @@ func TestGWSExecute_StripGWSPrefix(t *testing.T) {
 }
 
 func TestGWSExecute_StructuredParams(t *testing.T) {
-	tool, _, runner := setupGWSTest(t, false, nil)
+	tool, _, runner := setupGWSTest(t, false, map[string]bool{
+		"https://www.googleapis.com/auth/calendar": true,
+		"https://www.googleapis.com/auth/drive":    true,
+	})
 	runner.outputs[`drive files list --params {"orderBy":"modifiedTime desc","pageSize":5,"q":"mimeType='application/vnd.google-apps.document'"}`] = `{"files":[]}`
 
 	input, _ := json.Marshal(map[string]any{
