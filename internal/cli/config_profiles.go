@@ -292,9 +292,52 @@ func buildTierOptions(available []config.ModelInfo, tier string) []huh.Option[st
 	return options
 }
 
+var configProfilesDeleteCmd = &cobra.Command{
+	Use:   "delete <name>",
+	Short: "Delete a custom model profile",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		name := args[0]
+
+		if _, ok := config.Profiles[name]; ok {
+			return fmt.Errorf("cannot delete built-in profile %q", name)
+		}
+
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
+
+		if cfg.Models == nil || cfg.Models.CustomProfiles == nil {
+			return fmt.Errorf("custom profile %q not found", name)
+		}
+		if _, ok := cfg.Models.CustomProfiles[name]; !ok {
+			return fmt.Errorf("custom profile %q not found", name)
+		}
+
+		delete(cfg.Models.CustomProfiles, name)
+		if len(cfg.Models.CustomProfiles) == 0 {
+			cfg.Models.CustomProfiles = nil
+		}
+
+		// Clear active profile if it was the deleted one.
+		if cfg.Models.Profile == name {
+			cfg.Models.Profile = ""
+		}
+
+		if err := cfg.Save(); err != nil {
+			return fmt.Errorf("save config: %w", err)
+		}
+
+		fmt.Printf("Deleted custom profile %q\n", name)
+		return nil
+	},
+}
+
 func init() {
 	configProfilesCmd.AddCommand(configProfilesListCmd)
 	configProfilesCmd.AddCommand(configProfilesShowCmd)
 	configProfilesCmd.AddCommand(configProfilesCreateCmd)
+	configProfilesCmd.AddCommand(configProfilesDeleteCmd)
 	configCmd.AddCommand(configProfilesCmd)
 }
