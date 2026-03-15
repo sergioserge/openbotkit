@@ -205,8 +205,9 @@ func googleInteractiveNewAccount(ctx context.Context, gp *google.Google) error {
 	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
-				Title("Select access to enable").
+				Title("Select access to enable (space to toggle, enter to confirm)").
 				Options(options...).
+				Height(len(availableScopeChoices)+2).
 				Value(&selectedScopes),
 		),
 	).Run()
@@ -289,8 +290,9 @@ func googleInteractiveManage(ctx context.Context, gp *google.Google, accounts []
 	err = huh.NewForm(
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
-				Title("Manage access for "+action).
+				Title("Manage access for "+action+" (space to toggle, enter to confirm)").
 				Options(options...).
+				Height(len(availableScopeChoices)+2).
 				Value(&selectedScopes),
 		),
 	).Run()
