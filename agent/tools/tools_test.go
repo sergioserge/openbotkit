@@ -390,7 +390,7 @@ func TestBuildSystemBlocks_BaseOnly(t *testing.T) {
 	if !strings.Contains(blocks[0].Text, "bash") {
 		t.Error("base block should contain tool names")
 	}
-	if !strings.Contains(blocks[1].Text, "Today's date:") {
+	if !strings.Contains(blocks[1].Text, "Current date and time:") {
 		t.Error("extras block should contain today's date")
 	}
 }
@@ -406,7 +406,7 @@ func TestBuildSystemBlocks_WithExtras(t *testing.T) {
 	if blocks[1].CacheControl != nil {
 		t.Error("extras block should not have cache_control")
 	}
-	if !strings.Contains(blocks[1].Text, "Today's date:") {
+	if !strings.Contains(blocks[1].Text, "Current date and time:") {
 		t.Error("extras block should contain today's date")
 	}
 	if !strings.Contains(blocks[1].Text, "Be concise.") || !strings.Contains(blocks[1].Text, "User likes Go.") {

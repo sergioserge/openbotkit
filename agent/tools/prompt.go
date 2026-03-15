@@ -155,8 +155,9 @@ func BuildSystemBlocks(identity string, reg *Registry, extras ...string) []provi
 	blocks := []provider.SystemBlock{
 		{Text: base, CacheControl: &provider.CacheControl{Type: "ephemeral"}},
 	}
-	// Current date goes in the dynamic (non-cacheable) block.
-	dateStr := "\nToday's date: " + time.Now().Format("January 2, 2006") + "\n"
+	// Current date/time goes in the dynamic (non-cacheable) block.
+	now := time.Now()
+	dateStr := "\nCurrent date and time: " + now.Format("January 2, 2006 3:04 PM (MST)") + "\n"
 	extra := dateStr + strings.Join(extras, "")
 	blocks = append(blocks, provider.SystemBlock{Text: extra})
 	return blocks
