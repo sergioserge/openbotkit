@@ -63,3 +63,22 @@ func TestAllProfilesInProfileNames(t *testing.T) {
 		}
 	}
 }
+
+func TestProfilesHaveCategory(t *testing.T) {
+	for name, profile := range Profiles {
+		if profile.Category != "single" && profile.Category != "multi" {
+			t.Errorf("profile %q: Category = %q, want \"single\" or \"multi\"", name, profile.Category)
+		}
+	}
+}
+
+func TestSingleProviderProfilesHaveOneProvider(t *testing.T) {
+	for name, profile := range Profiles {
+		if profile.Category != "single" {
+			continue
+		}
+		if len(profile.Providers) != 1 {
+			t.Errorf("profile %q: single-provider profile has %d providers, want 1", name, len(profile.Providers))
+		}
+	}
+}
