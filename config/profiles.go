@@ -1,5 +1,10 @@
 package config
 
+import (
+	"fmt"
+	"regexp"
+)
+
 // ModelProfile defines a preset tier→model mapping based on budget.
 type ModelProfile struct {
 	Name        string
@@ -117,4 +122,20 @@ var Profiles = map[string]ModelProfile{
 var ProfileNames = []string{
 	"gemini", "anthropic", "openrouter", "openai",
 	"starter", "standard", "premium",
+}
+
+var profileNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]{1,29}$`)
+
+// ValidateProfileName checks that a custom profile name is valid.
+func ValidateProfileName(name string) error {
+	if !profileNameRe.MatchString(name) {
+		return fmt.Errorf("profile name must be 2-30 lowercase alphanumeric characters or hyphens, starting with a letter")
+	}
+	if _, ok := Profiles[name]; ok {
+		return fmt.Errorf("profile name %q conflicts with a built-in profile", name)
+	}
+	if name == "custom" {
+		return fmt.Errorf("profile name %q is reserved", name)
+	}
+	return nil
 }
