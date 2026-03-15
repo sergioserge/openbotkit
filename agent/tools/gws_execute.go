@@ -211,9 +211,19 @@ func (g *GWSExecuteTool) requestConsent(ctx context.Context, scopes []string) er
 }
 
 func (g *GWSExecuteTool) isWriteCommand(args []string) bool {
+	if g.manifest == nil {
+		return false
+	}
+	// Build the expected skill name from the command args.
+	// e.g. ["calendar", "+agenda"] → "gws-calendar-agenda"
+	service := gwsServiceFromCommand(args)
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "+") {
-			return true
+			skillName := "gws-" + service + "-" + strings.TrimPrefix(arg, "+")
+			if entry, ok := g.manifest.Skills[skillName]; ok {
+				return entry.Write
+			}
+			return true // unknown + command, assume write to be safe
 		}
 	}
 	return false

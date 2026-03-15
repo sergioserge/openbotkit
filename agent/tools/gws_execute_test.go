@@ -53,8 +53,10 @@ func setupGWSTest(t *testing.T, approveAll bool, scopes map[string]bool) (*GWSEx
 
 	manifest := &skills.Manifest{
 		Skills: map[string]skills.SkillEntry{
-			"gws-calendar-list": {Source: "gws", Scopes: []string{"calendar"}, Write: false},
-			"gws-calendar-edit": {Source: "gws", Scopes: []string{"calendar"}, Write: true},
+			"gws-calendar-list":   {Source: "gws", Scopes: []string{"calendar"}, Write: false},
+			"gws-calendar-edit":   {Source: "gws", Scopes: []string{"calendar"}, Write: true},
+			"gws-calendar-agenda": {Source: "gws", Scopes: []string{"calendar"}, Write: false},
+			"gws-calendar-insert": {Source: "gws", Scopes: []string{"calendar"}, Write: true},
 		},
 	}
 
@@ -278,6 +280,23 @@ func (c *toggleScopeChecker) HasScopes(_ string, _ []string) (bool, error) {
 		return false, nil
 	}
 	return c.hasAfterSignal, nil
+}
+
+func TestGWSExecute_ReadOnlyHelperNotWrite(t *testing.T) {
+	tool, inter, runner := setupGWSTest(t, false, nil)
+	runner.outputs["calendar +agenda"] = `{"events":[]}`
+
+	input, _ := json.Marshal(gwsInput{Command: "calendar +agenda"})
+	result, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result != `{"events":[]}` {
+		t.Errorf("result = %q", result)
+	}
+	if len(inter.approvals) > 0 {
+		t.Error("+agenda is read-only, should not trigger approval")
+	}
 }
 
 func TestGWSExecute_KeywordNotWrite(t *testing.T) {
