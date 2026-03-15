@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/charmbracelet/huh"
 	"github.com/priyanshujain/openbotkit/config"
 	"github.com/spf13/cobra"
 )
@@ -135,8 +136,165 @@ var configProfilesShowCmd = &cobra.Command{
 	},
 }
 
+var configProfilesCreateCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a custom model profile",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
+
+		fmt.Println("\n  Create a custom model profile\n")
+
+		// Profile name.
+		var name string
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Profile name").
+					Validate(func(s string) error {
+						if err := config.ValidateProfileName(s); err != nil {
+							return err
+						}
+						if cfg.Models != nil {
+							if _, ok := cfg.Models.CustomProfiles[s]; ok {
+								return fmt.Errorf("custom profile %q already exists", s)
+							}
+						}
+						return nil
+					}).
+					Value(&name),
+			),
+		).Run()
+		if err != nil {
+			return err
+		}
+
+		// Optional label.
+		var label string
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Label (optional)").
+					Value(&label),
+			),
+		).Run()
+		if err != nil {
+			return err
+		}
+
+		// Provider selection.
+		var selectedProviders []string
+		var providerOptions []huh.Option[string]
+		for _, p := range llmProviders {
+			providerOptions = append(providerOptions, huh.NewOption(p.label, p.name))
+		}
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewMultiSelect[string]().
+					Title("Select providers").
+					Options(providerOptions...).
+					Validate(func(s []string) error {
+						if len(s) == 0 {
+							return fmt.Errorf("select at least one provider")
+						}
+						return nil
+					}).
+					Value(&selectedProviders),
+			),
+		).Run()
+		if err != nil {
+			return err
+		}
+
+		// Build model options for each tier.
+		available := config.ModelsForProviders(selectedProviders)
+		tiers := config.ProfileTiers{}
+
+		tierDefs := []struct {
+			name  string
+			title string
+			dest  *string
+		}{
+			{"default", "Default tier (main conversation, skill execution)", &tiers.Default},
+			{"complex", "Complex tier (strongest reasoning)", &tiers.Complex},
+			{"fast", "Fast tier (latency-sensitive tasks)", &tiers.Fast},
+			{"nano", "Nano tier (trivial tasks)", &tiers.Nano},
+		}
+
+		for _, td := range tierDefs {
+			options := buildTierOptions(available, td.name)
+			if len(options) == 0 {
+				return fmt.Errorf("no models available for %s tier from selected providers", td.name)
+			}
+			*td.dest = options[0].Value
+			err = huh.NewForm(
+				huh.NewGroup(
+					huh.NewSelect[string]().
+						Title(td.title).
+						Options(options...).
+						Value(td.dest),
+				),
+			).Run()
+			if err != nil {
+				return err
+			}
+		}
+
+		// Warn if default model has small context window.
+		warnDefaultContextWindow(tiers.Default)
+
+		// Save the custom profile.
+		if cfg.Models == nil {
+			cfg.Models = &config.ModelsConfig{}
+		}
+		if cfg.Models.CustomProfiles == nil {
+			cfg.Models.CustomProfiles = make(map[string]config.CustomProfile)
+		}
+		cfg.Models.CustomProfiles[name] = config.CustomProfile{
+			Label:     label,
+			Tiers:     tiers,
+			Providers: selectedProviders,
+		}
+		if err := cfg.Save(); err != nil {
+			return fmt.Errorf("save config: %w", err)
+		}
+
+		fmt.Printf("\n  Profile %q saved!\n", name)
+		fmt.Printf("    Default: %s\n", tiers.Default)
+		fmt.Printf("    Complex: %s\n", tiers.Complex)
+		fmt.Printf("    Fast:    %s\n", tiers.Fast)
+		fmt.Printf("    Nano:    %s\n", tiers.Nano)
+		fmt.Println("\n  Activate with: obk setup models")
+		return nil
+	},
+}
+
+// buildTierOptions creates huh.Options for a tier, with recommended models first.
+func buildTierOptions(available []config.ModelInfo, tier string) []huh.Option[string] {
+	recommended := config.ModelsForTier(available, tier)
+	seen := make(map[string]bool)
+
+	var options []huh.Option[string]
+	for _, m := range recommended {
+		spec := m.Provider + "/" + m.ID
+		seen[spec] = true
+		options = append(options, huh.NewOption(m.Label+" *", spec))
+	}
+	for _, m := range available {
+		spec := m.Provider + "/" + m.ID
+		if !seen[spec] {
+			seen[spec] = true
+			options = append(options, huh.NewOption(m.Label, spec))
+		}
+	}
+	return options
+}
+
 func init() {
 	configProfilesCmd.AddCommand(configProfilesListCmd)
 	configProfilesCmd.AddCommand(configProfilesShowCmd)
+	configProfilesCmd.AddCommand(configProfilesCreateCmd)
 	configCmd.AddCommand(configProfilesCmd)
 }
