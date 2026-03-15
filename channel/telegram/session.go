@@ -263,6 +263,10 @@ func (sm *SessionManager) endSession() {
 }
 
 func (sm *SessionManager) extractMemories(ctx context.Context, messages []string) {
+	if sm.cfg.Models == nil || sm.cfg.Models.Default == "" {
+		return
+	}
+
 	memDB, err := store.Open(store.Config{
 		Driver: sm.cfg.UserMemory.Storage.Driver,
 		DSN:    sm.cfg.UserMemoryDataDSN(),
