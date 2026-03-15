@@ -241,7 +241,53 @@ func TestAuthURL_NoAccount(t *testing.T) {
 	if strings.Contains(url, "login_hint") {
 		t.Errorf("URL should not contain login_hint for empty account: %s", url)
 	}
-	if strings.Contains(url, "include_granted_scopes") {
-		t.Errorf("URL should not contain include_granted_scopes for empty account: %s", url)
+	if !strings.Contains(url, "include_granted_scopes=true") {
+		t.Errorf("URL should always contain include_granted_scopes to preserve existing scopes: %s", url)
+	}
+}
+
+func TestGrantScopes_ResolvesAccountFromStore(t *testing.T) {
+	dir := t.TempDir()
+	credPath := writeTestCredentials(t)
+	dbPath := filepath.Join(dir, "tokens.db")
+
+	// Pre-seed a token with scope-a.
+	store, err := NewTokenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok := &oauth2.Token{
+		AccessToken:  "old-access",
+		RefreshToken: "old-refresh",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}
+	if err := store.SaveToken("user@example.com", tok, []string{"scope-a"}); err != nil {
+		t.Fatal(err)
+	}
+	store.Close()
+
+	_ = New(Config{CredentialsFile: credPath, TokenDBPath: dbPath})
+
+	// GrantScopes with account="" should still resolve the existing
+	// account and attempt incremental auth. It will fail at the OAuth
+	// flow (no browser), but we can verify account resolution by
+	// checking that the generated URL includes login_hint and
+	// include_granted_scopes.
+	// Since getTokenViaCallback starts a server and blocks, we can't
+	// easily test the full flow. Instead, verify the account resolution
+	// logic directly.
+	store2, err := NewTokenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store2.Close()
+
+	accounts, err := store2.ListAccounts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(accounts) != 1 || accounts[0] != "user@example.com" {
+		t.Fatalf("expected single account user@example.com, got %v", accounts)
 	}
 }

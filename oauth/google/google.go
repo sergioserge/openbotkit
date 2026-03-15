@@ -57,6 +57,19 @@ func (g *Google) Client(ctx context.Context, account string, scopes []string) (*
 }
 
 func (g *Google) GrantScopes(ctx context.Context, account string, scopes []string) (string, error) {
+	// Resolve account from token store if not provided, so we can
+	// do incremental auth and preserve existing scopes.
+	if account == "" {
+		store, err := NewTokenStore(g.cfg.TokenDBPath)
+		if err == nil {
+			accounts, err := store.ListAccounts()
+			store.Close()
+			if err == nil && len(accounts) == 1 {
+				account = accounts[0]
+			}
+		}
+	}
+
 	oauthCfg, err := loadConfig(g.cfg.CredentialsFile, scopes, "")
 	if err != nil {
 		return "", err
@@ -64,7 +77,6 @@ func (g *Google) GrantScopes(ctx context.Context, account string, scopes []strin
 
 	var authOpts []oauth2.AuthCodeOption
 	if account != "" {
-		// Incremental auth: keep existing scopes, add new ones.
 		authOpts = append(authOpts,
 			oauth2.SetAuthURLParam("login_hint", account),
 			oauth2.SetAuthURLParam("include_granted_scopes", "true"),
@@ -83,7 +95,7 @@ func (g *Google) GrantScopes(ctx context.Context, account string, scopes []strin
 		return "", fmt.Errorf("fetch user email: %w", err)
 	}
 
-	// Merge with existing scopes if this is an incremental grant.
+	// Always merge with existing scopes to avoid replacing them.
 	store, err := NewTokenStore(g.cfg.TokenDBPath)
 	if err != nil {
 		return "", fmt.Errorf("open token store: %w", err)
@@ -91,11 +103,9 @@ func (g *Google) GrantScopes(ctx context.Context, account string, scopes []strin
 	defer store.Close()
 
 	allScopes := scopes
-	if account != "" {
-		_, existing, err := store.LoadToken(account)
-		if err == nil {
-			allScopes = mergeScopes(existing, scopes)
-		}
+	_, existing, loadErr := store.LoadToken(email)
+	if loadErr == nil {
+		allScopes = mergeScopes(existing, scopes)
 	}
 
 	if err := store.SaveToken(email, tok, allScopes); err != nil {
@@ -244,11 +254,11 @@ func (g *Google) AuthURL(account string, scopes []string, state string) (string,
 	opts := []oauth2.AuthCodeOption{
 		oauth2.AccessTypeOffline,
 		oauth2.SetAuthURLParam("prompt", "consent"),
+		oauth2.SetAuthURLParam("include_granted_scopes", "true"),
 	}
 	if account != "" {
 		opts = append(opts,
 			oauth2.SetAuthURLParam("login_hint", account),
-			oauth2.SetAuthURLParam("include_granted_scopes", "true"),
 		)
 	}
 
