@@ -499,6 +499,25 @@ func TestFeedback_ModelDecision_EmptyTextIgnored(t *testing.T) {
 	}
 }
 
+func TestFeedback_SignalBlocksUntilAckSent(t *testing.T) {
+	bot := &feedbackBot{}
+	fb := newTestFeedback(bot, nil, "") // nil provider → fast fallback
+	fb.timings.ackDelayMin = 10 * time.Second
+	fb.timings.ackDelayMax = 11 * time.Second
+
+	fb.Start(context.Background())
+
+	// Signal should block until the ack is sent.
+	fb.Signal("web_search")
+
+	// After Signal returns, the ack message should already be sent.
+	if bot.sendCount() != 1 {
+		t.Fatalf("expected ack to be sent before Signal returns, got %d sends", bot.sendCount())
+	}
+
+	fb.Stop()
+}
+
 func TestFeedback_TypingContinuesDuringModelCall(t *testing.T) {
 	bot := &feedbackBot{}
 	// Provider that takes 300ms to respond
