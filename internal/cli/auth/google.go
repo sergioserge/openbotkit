@@ -156,6 +156,12 @@ var availableScopeChoices = []scopeChoice{
 	{Label: "Gmail (read + write)", Scope: "https://www.googleapis.com/auth/gmail.modify"},
 	{Label: "Calendar (read)", Scope: "https://www.googleapis.com/auth/calendar.readonly"},
 	{Label: "Calendar (read + write)", Scope: "https://www.googleapis.com/auth/calendar"},
+	{Label: "Drive", Scope: "https://www.googleapis.com/auth/drive"},
+	{Label: "Drive (read)", Scope: "https://www.googleapis.com/auth/drive.readonly"},
+	{Label: "Docs", Scope: "https://www.googleapis.com/auth/documents"},
+	{Label: "Sheets", Scope: "https://www.googleapis.com/auth/spreadsheets"},
+	{Label: "Tasks", Scope: "https://www.googleapis.com/auth/tasks"},
+	{Label: "Contacts", Scope: "https://www.googleapis.com/auth/contacts"},
 }
 
 func googleInteractiveRun(cmd *cobra.Command, args []string) error {
@@ -292,7 +298,13 @@ func googleInteractiveManage(ctx context.Context, gp *google.Google, accounts []
 		return err
 	}
 
-	// Determine what to add and what to remove.
+	// Only manage scopes that were visible in the picker — don't
+	// touch scopes (like drive) that aren't in availableScopeChoices.
+	managedSet := make(map[string]bool, len(availableScopeChoices))
+	for _, sc := range availableScopeChoices {
+		managedSet[sc.Scope] = true
+	}
+
 	newSet := make(map[string]bool, len(selectedScopes))
 	for _, s := range selectedScopes {
 		newSet[s] = true
@@ -305,7 +317,7 @@ func googleInteractiveManage(ctx context.Context, gp *google.Google, accounts []
 		}
 	}
 	for _, s := range existing {
-		if !newSet[s] {
+		if !newSet[s] && managedSet[s] {
 			toRemove = append(toRemove, s)
 		}
 	}
@@ -366,6 +378,12 @@ var scopeAliases = map[string]string{
 	"gmail.modify":      "https://www.googleapis.com/auth/gmail.modify",
 	"calendar.readonly": "https://www.googleapis.com/auth/calendar.readonly",
 	"calendar":          "https://www.googleapis.com/auth/calendar",
+	"drive":             "https://www.googleapis.com/auth/drive",
+	"drive.readonly":    "https://www.googleapis.com/auth/drive.readonly",
+	"docs":              "https://www.googleapis.com/auth/documents",
+	"sheets":            "https://www.googleapis.com/auth/spreadsheets",
+	"tasks":             "https://www.googleapis.com/auth/tasks",
+	"contacts":          "https://www.googleapis.com/auth/contacts",
 }
 
 func parseScopes(s string) []string {
