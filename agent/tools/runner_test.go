@@ -10,6 +10,7 @@ import (
 // mockRunner records executed commands and returns canned output.
 type mockRunner struct {
 	outputs map[string]string
+	errs    map[string]error // per-command errors (output still comes from outputs map)
 	ran     []struct {
 		args []string
 		env  []string
@@ -22,10 +23,15 @@ func (m *mockRunner) Run(_ context.Context, args []string, env []string) (string
 		args []string
 		env  []string
 	}{args, env})
+	key := strings.Join(args, " ")
+	if m.errs != nil {
+		if e, ok := m.errs[key]; ok {
+			return m.outputs[key], e
+		}
+	}
 	if m.err != nil {
 		return "", m.err
 	}
-	key := strings.Join(args, " ")
 	if out, ok := m.outputs[key]; ok {
 		return out, nil
 	}

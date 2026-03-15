@@ -188,6 +188,13 @@ func (g *GWSExecuteTool) run(ctx context.Context, args []string) (string, error)
 		}
 	}
 
+	// If the API is disabled, flag it so the agent can extract the
+	// enablement URL from the error and share it with the user.
+	if runErr != nil && (strings.Contains(out, "SERVICE_DISABLED") || strings.Contains(out, "API has not been used")) {
+		slog.Warn("gws_execute: API disabled for service", "service", gwsServiceFromCommand(args))
+		out = out + "\n\nNote: The Google API for this service is not enabled. The error above contains an activation URL — share it with the user so they can enable the API."
+	}
+
 	out = TruncateHeadTail(out, MaxLinesHeadTail, MaxLinesHeadTail)
 	out = TruncateBytes(out, MaxOutputBytes)
 	return out, runErr
@@ -237,8 +244,8 @@ func (g *GWSExecuteTool) isWriteCommand(args []string) bool {
 	// e.g. ["calendar", "+agenda"] → "gws-calendar-agenda"
 	service := gwsServiceFromCommand(args)
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "+") {
-			skillName := "gws-" + service + "-" + strings.TrimPrefix(arg, "+")
+		if sub, ok := strings.CutPrefix(arg, "+"); ok {
+			skillName := "gws-" + service + "-" + sub
 			if entry, ok := g.manifest.Skills[skillName]; ok {
 				return entry.Write
 			}

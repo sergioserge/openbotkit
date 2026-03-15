@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -573,6 +574,37 @@ func TestGWSExecute_Name(t *testing.T) {
 	}
 	if !json.Valid(tool.InputSchema()) {
 		t.Error("invalid input schema")
+	}
+}
+
+func TestGWSExecute_ServiceDisabledAnnotation(t *testing.T) {
+	tool, inter, runner := setupGWSTest(t, false, nil)
+
+	apiError := `{"error":{"code":403,"message":"Google Calendar API has not been used in project 123456 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=123456 then retry.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com"}]}}`
+	runner.outputs["calendar events list"] = apiError
+	runner.errs = map[string]error{"calendar events list": fmt.Errorf("exit status 1")}
+
+	input, _ := json.Marshal(gwsInput{Command: "calendar events list"})
+	result, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error for disabled API")
+	}
+	if !strings.Contains(result, "SERVICE_DISABLED") {
+		t.Error("result should contain original SERVICE_DISABLED error")
+	}
+	if !strings.Contains(result, "console.developers.google.com") {
+		t.Error("result should preserve the activation URL")
+	}
+	if !strings.Contains(result, "The Google API for this service is not enabled") {
+		t.Error("result should contain annotation note")
+	}
+	// No re-auth should be triggered (re-auth can't fix a disabled API).
+	if len(inter.links) > 0 {
+		t.Error("SERVICE_DISABLED should not trigger re-auth")
+	}
+	// Command should only run once (no retry).
+	if len(runner.ran) != 1 {
+		t.Errorf("expected 1 run, got %d", len(runner.ran))
 	}
 }
 
