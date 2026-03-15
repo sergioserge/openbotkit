@@ -81,10 +81,8 @@ If the error mentions "API has not been used" or "SERVICE_DISABLED", extract the
 ## Task Delegation
 Use delegate_task for complex tasks: research, analysis, code generation.
 Delegated agents have full permissions: web search, file operations, and shell access.
-For multi-step workflows, provide steps in the spec — they execute as a single agent run.
-Set async=true for tasks taking more than a minute. You'll be notified of progress periodically.
-Use check_task to retrieve results, then deliver them using your tools (gws_execute for Google Docs, slack_send for Slack, etc.).
-Example workflow: delegate research → check_task → gws_execute to create doc → slack_send to share link.
+Results are saved to a file. Use file_read to review relevant sections, then deliver using your tools (gws_execute for Google Docs, slack_send for Slack, etc.).
+Never paste raw delegation results to the user — always create the requested deliverable.
 `)
 	}
 
