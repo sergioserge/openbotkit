@@ -20,6 +20,19 @@ type ProfileTiers struct {
 
 // Profiles contains the built-in model profile presets.
 var Profiles = map[string]ModelProfile{
+	"gemini": {
+		Name:        "gemini",
+		Label:       "Gemini (1 API key)",
+		Description: "Google Gemini models. Free tier available.",
+		Category:    "single",
+		Tiers: ProfileTiers{
+			Default: "gemini/gemini-2.5-flash",
+			Complex: "gemini/gemini-2.5-pro",
+			Fast:    "gemini/gemini-2.0-flash-lite",
+			Nano:    "gemini/gemini-2.0-flash-lite",
+		},
+		Providers: []string{"gemini"},
+	},
 	"starter": {
 		Name:        "starter",
 		Label:       "Starter (~$20/mo)",
@@ -62,4 +75,4 @@ var Profiles = map[string]ModelProfile{
 }
 
 // ProfileNames returns profile names in display order.
-var ProfileNames = []string{"starter", "standard", "premium"}
+var ProfileNames = []string{"gemini", "starter", "standard", "premium"}
