@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/provider"
 )
 
 func TestProfileTestModels_PicksOnePerProvider(t *testing.T) {
@@ -51,6 +52,58 @@ func TestProfileTestModels_FirstModelPerProvider(t *testing.T) {
 	// Should pick the first one encountered (Default) for openrouter.
 	if result["openrouter"] != "anthropic/claude-haiku-4-5" {
 		t.Errorf("openrouter model = %q, want anthropic/claude-haiku-4-5", result["openrouter"])
+	}
+}
+
+func TestProfileTestModels_AllRealProfiles(t *testing.T) {
+	for _, name := range config.ProfileNames {
+		profile := config.Profiles[name]
+		testModels := profileTestModels(profile)
+
+		// Every provider in profile.Providers must get a test model.
+		for _, provName := range profile.Providers {
+			model, ok := testModels[provName]
+			if !ok {
+				t.Errorf("profile %q: provider %q has no test model", name, provName)
+				continue
+			}
+			if model == "" {
+				t.Errorf("profile %q: provider %q has empty test model", name, provName)
+			}
+		}
+
+		// No test model should map to a provider not in the profile's list.
+		provSet := make(map[string]bool)
+		for _, p := range profile.Providers {
+			provSet[p] = true
+		}
+		for provName := range testModels {
+			if !provSet[provName] {
+				t.Errorf("profile %q: test model for %q but not in Providers list", name, provName)
+			}
+		}
+	}
+}
+
+func TestProfileProviders_HaveRegisteredFactories(t *testing.T) {
+	for _, name := range config.ProfileNames {
+		profile := config.Profiles[name]
+		for _, provName := range profile.Providers {
+			if _, ok := provider.GetFactory(provName); !ok {
+				t.Errorf("profile %q: provider %q has no registered factory", name, provName)
+			}
+		}
+	}
+}
+
+func TestProfileProviders_HaveEnvVars(t *testing.T) {
+	for _, name := range config.ProfileNames {
+		profile := config.Profiles[name]
+		for _, provName := range profile.Providers {
+			if _, ok := provider.ProviderEnvVars[provName]; !ok {
+				t.Errorf("profile %q: provider %q has no env var mapping", name, provName)
+			}
+		}
 	}
 }
 
