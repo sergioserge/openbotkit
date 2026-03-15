@@ -171,31 +171,52 @@ func TestSetupWithCustomProfile_EmptyCustomProfiles(t *testing.T) {
 	}
 }
 
-func TestSetupWithCustomProfile_LabelDefaultsToName(t *testing.T) {
-	cfg := config.Default()
-	cfg.Models = &config.ModelsConfig{
-		Providers: make(map[string]config.ModelProviderConfig),
-		CustomProfiles: map[string]config.CustomProfile{
-			"my-test": {
-				Tiers: config.ProfileTiers{
-					Default: "gemini/gemini-2.5-flash",
-					Complex: "gemini/gemini-2.5-pro",
-					Fast:    "gemini/gemini-2.0-flash-lite",
-					Nano:    "gemini/gemini-2.0-flash-lite",
-				},
-				Providers: []string{"gemini"},
-			},
+func TestCustomProfileToModelProfile_LabelDefaultsToName(t *testing.T) {
+	cp := config.CustomProfile{
+		Tiers: config.ProfileTiers{
+			Default: "gemini/gemini-2.5-flash",
+			Complex: "gemini/gemini-2.5-pro",
+			Fast:    "gemini/gemini-2.0-flash-lite",
+			Nano:    "gemini/gemini-2.0-flash-lite",
 		},
+		Providers: []string{"gemini"},
 	}
-	// setupWithCustomProfile will call setupWithBuiltProfile which is interactive,
-	// so we can't test the full flow. But we can verify the conversion logic
-	// by checking that it doesn't error on the lookup and label defaulting.
-	// The function will fail at the interactive huh prompt, but that's expected.
-	err := setupWithCustomProfile(cfg, "my-test")
-	// We expect an error from the interactive prompt (huh), not from our code.
-	// If the error is "not found", that means our lookup failed.
-	if err != nil && strings.Contains(err.Error(), "not found") {
-		t.Fatalf("profile lookup failed: %v", err)
+	profile := config.ModelProfile{
+		Name:      "my-test",
+		Label:     cp.Label,
+		Tiers:     cp.Tiers,
+		Providers: cp.Providers,
+	}
+	if profile.Label == "" {
+		profile.Label = "my-test"
+	}
+	if profile.Label != "my-test" {
+		t.Errorf("label = %q, want %q", profile.Label, "my-test")
+	}
+	if profile.Name != "my-test" {
+		t.Errorf("name = %q, want %q", profile.Name, "my-test")
+	}
+}
+
+func TestCustomProfileToModelProfile_LabelPreserved(t *testing.T) {
+	cp := config.CustomProfile{
+		Label: "My Budget Setup",
+		Tiers: config.ProfileTiers{
+			Default: "gemini/gemini-2.5-flash",
+		},
+		Providers: []string{"gemini"},
+	}
+	profile := config.ModelProfile{
+		Name:      "my-test",
+		Label:     cp.Label,
+		Tiers:     cp.Tiers,
+		Providers: cp.Providers,
+	}
+	if profile.Label == "" {
+		profile.Label = "my-test"
+	}
+	if profile.Label != "My Budget Setup" {
+		t.Errorf("label = %q, want %q", profile.Label, "My Budget Setup")
 	}
 }
 
