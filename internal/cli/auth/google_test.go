@@ -54,8 +54,8 @@ func TestExpandScopes(t *testing.T) {
 		},
 		{
 			name:  "unknown alias passed through",
-			input: []string{"drive.readonly"},
-			want:  []string{"drive.readonly"},
+			input: []string{"some.unknown.scope"},
+			want:  []string{"some.unknown.scope"},
 		},
 		{
 			name:  "empty",
