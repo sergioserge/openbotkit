@@ -33,6 +33,7 @@ Profiles are organized into two categories: **single-provider** (1 API key) and 
 |---------|---------|---------|------|------|----------|
 | Gemini | gemini-2.5-flash | gemini-2.5-pro | gemini-2.0-flash-lite | gemini-2.0-flash-lite | gemini |
 | Anthropic | claude-haiku-4-5 | claude-sonnet-4-6 | claude-haiku-4-5 | claude-haiku-4-5 | anthropic |
+| Groq | llama-3.3-70b | llama-4-scout-17b | llama-3.1-8b | llama-3.1-8b | groq |
 | OpenRouter | claude-haiku-4-5 (OR) | claude-sonnet-4-6 (OR) | gemini-flash-lite (OR) | gemini-flash-lite (OR) | openrouter |
 | OpenAI | gpt-4o-mini | gpt-4o | gpt-4o-mini | gpt-4o-mini | openai |
 
