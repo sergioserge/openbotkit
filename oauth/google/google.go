@@ -75,11 +75,12 @@ func (g *Google) GrantScopes(ctx context.Context, account string, scopes []strin
 		return "", err
 	}
 
-	var authOpts []oauth2.AuthCodeOption
+	authOpts := []oauth2.AuthCodeOption{
+		oauth2.SetAuthURLParam("include_granted_scopes", "true"),
+	}
 	if account != "" {
 		authOpts = append(authOpts,
 			oauth2.SetAuthURLParam("login_hint", account),
-			oauth2.SetAuthURLParam("include_granted_scopes", "true"),
 		)
 	}
 
