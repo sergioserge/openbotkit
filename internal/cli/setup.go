@@ -17,6 +17,7 @@ import (
 	"github.com/priyanshujain/openbotkit/remote"
 	ansrc "github.com/priyanshujain/openbotkit/source/applenotes"
 	contactsrc "github.com/priyanshujain/openbotkit/source/contacts"
+	imsrc "github.com/priyanshujain/openbotkit/source/imessage"
 	slacksrc "github.com/priyanshujain/openbotkit/source/slack"
 	"github.com/priyanshujain/openbotkit/source/slack/desktop"
 	"github.com/priyanshujain/openbotkit/store"
@@ -72,6 +73,7 @@ var setupCmd = &cobra.Command{
 		if runtime.GOOS == "darwin" {
 			sourceOptions = append(sourceOptions, huh.NewOption("Apple Notes", "applenotes"))
 			sourceOptions = append(sourceOptions, huh.NewOption("Apple Contacts", "applecontacts"))
+			sourceOptions = append(sourceOptions, huh.NewOption("iMessage", "imessage"))
 		}
 
 		err = huh.NewForm(
@@ -163,6 +165,10 @@ var setupCmd = &cobra.Command{
 				if err := setupAppleContacts(cfg); err != nil {
 					return err
 				}
+			case "imessage":
+				if err := setupIMessage(cfg); err != nil {
+					return err
+				}
 			case "slack":
 				if err := setupSlack(cfg); err != nil {
 					return err
@@ -202,6 +208,8 @@ var setupCmd = &cobra.Command{
 				fmt.Println("    - Apple Notes is ready (synced during setup)")
 			case "applecontacts":
 				fmt.Println("    - Apple Contacts is ready (synced during setup)")
+			case "imessage":
+				fmt.Println("    - iMessage is ready (synced during setup)")
 			case "slack":
 				fmt.Println("    - Slack is ready! Try: obk slack channels")
 			case "telegram":
@@ -573,6 +581,38 @@ func setupAppleContacts(cfg *config.Config) error {
 	}
 
 	fmt.Printf("  Synced %d contacts (%d new, %d linked)\n", result.Created+result.Linked, result.Created, result.Linked)
+	return nil
+}
+
+func setupIMessage(cfg *config.Config) error {
+	fmt.Println("\n  Setting up iMessage...")
+	fmt.Println("  iMessage requires Full Disk Access to read the chat database.")
+	fmt.Println("  Grant access in System Settings > Privacy & Security > Full Disk Access.")
+	fmt.Println()
+
+	if err := config.EnsureSourceDir("imessage"); err != nil {
+		return fmt.Errorf("create imessage dir: %w", err)
+	}
+
+	db, err := store.Open(store.Config{
+		Driver: cfg.IMessage.Storage.Driver,
+		DSN:    cfg.IMessageDataDSN(),
+	})
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer db.Close()
+
+	result, err := imsrc.Sync(db, imsrc.SyncOptions{})
+	if err != nil {
+		return fmt.Errorf("imessage sync: %w", err)
+	}
+
+	if err := config.LinkSource("imessage"); err != nil {
+		return fmt.Errorf("link source: %w", err)
+	}
+
+	fmt.Printf("  Synced %d messages\n", result.Synced)
 	return nil
 }
 
