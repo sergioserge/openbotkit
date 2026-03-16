@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/provider"
 	"github.com/priyanshujain/openbotkit/remote"
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
 	"github.com/spf13/cobra"
@@ -122,7 +123,7 @@ func whatsappLoginRemote(cfg *config.Config) error {
 	}
 
 	// Poll the server until authentication completes.
-	client := remote.NewClient(cfg.Remote.Server, cfg.Remote.Username, cfg.Remote.Password)
+	client := remote.NewClient(cfg.Remote.Server, cfg.Remote.Username, cfg.Remote.ResolvedPassword(provider.LoadCredential))
 	fmt.Println("\nWaiting for authentication to complete...")
 	if err := client.WaitWhatsAppAuth(); err != nil {
 		return err
