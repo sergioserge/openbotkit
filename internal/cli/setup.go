@@ -203,6 +203,10 @@ var setupCmd = &cobra.Command{
 			if tz == "" {
 				tz = systemTZ
 			}
+			if _, err := time.LoadLocation(tz); err != nil {
+				fmt.Printf("  Invalid timezone %q, using %s\n", tz, systemTZ)
+				tz = systemTZ
+			}
 			cfg.Timezone = tz
 		}
 
