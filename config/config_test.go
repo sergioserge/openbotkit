@@ -568,6 +568,25 @@ func TestCustomProfile_EmptyLabelAndDescription(t *testing.T) {
 	}
 }
 
+func TestGmailSyncDays_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	cfg := Default()
+	cfg.Gmail.SyncDays = 30
+	if err := cfg.SaveTo(cfgPath); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	loaded, err := LoadFrom(cfgPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if loaded.Gmail.SyncDays != 30 {
+		t.Fatalf("expected SyncDays=30, got %d", loaded.Gmail.SyncDays)
+	}
+}
+
 func TestSaveAndLoad(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.yaml")
