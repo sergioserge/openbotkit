@@ -30,6 +30,7 @@ var gwsServices = []string{"calendar", "drive", "docs", "sheets", "tasks", "peop
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Guided first-time setup for OpenBotKit",
+	Example: `  obk setup`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := tty.RequireInteractive("configure manually with 'obk config' and 'obk gmail auth login'"); err != nil {
 			return err

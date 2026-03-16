@@ -21,8 +21,9 @@ func newLogsCmd(serviceName string) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "logs",
-		Short: fmt.Sprintf("Show %s logs", serviceName),
+		Use:     "logs",
+		Short:   fmt.Sprintf("Show %s logs", serviceName),
+		Example: fmt.Sprintf("  obk %s logs\n  obk %s logs --follow --tail 100", serviceName, serviceName),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			home, err := os.UserHomeDir()
 			if err != nil {

@@ -21,6 +21,8 @@ var configProfilesCmd = &cobra.Command{
 var configProfilesListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all model profiles (built-in + custom)",
+	Example: `  obk config profiles list
+  obk config profiles list --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
@@ -116,6 +118,8 @@ var configProfilesListCmd = &cobra.Command{
 var configProfilesShowCmd = &cobra.Command{
 	Use:   "describe <name>",
 	Short: "Describe a model profile",
+	Example: `  obk config profiles describe claude-all
+  obk config profiles describe my-custom-profile`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -171,6 +175,7 @@ func printProfileDetails(name, label, description, category string, providers []
 var configProfilesCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a custom model profile",
+	Example: `  obk config profiles create`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
@@ -327,6 +332,8 @@ func buildTierOptions(available []config.ModelInfo, tier string) []huh.Option[st
 var configProfilesDeleteCmd = &cobra.Command{
 	Use:   "delete <name>",
 	Short: "Delete a custom model profile",
+	Example: `  obk config profiles delete my-custom-profile
+  obk config profiles delete my-custom-profile --force`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]

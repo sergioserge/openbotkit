@@ -20,8 +20,9 @@ var authCmd = &cobra.Command{
 }
 
 var authLoginCmd = &cobra.Command{
-	Use:   "login",
-	Short: "Authenticate WhatsApp by scanning a QR code",
+	Use:     "login",
+	Short:   "Authenticate WhatsApp by scanning a QR code",
+	Example: `  obk whatsapp auth login`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
@@ -58,6 +59,8 @@ var authLoginCmd = &cobra.Command{
 var authLogoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Disconnect and clear WhatsApp session",
+	Example: `  obk whatsapp auth logout
+  obk whatsapp auth logout --force`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
@@ -96,6 +99,8 @@ var authLogoutCmd = &cobra.Command{
 var authStatusCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List WhatsApp authentication status",
+	Example: `  obk whatsapp auth list
+  obk whatsapp auth list --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

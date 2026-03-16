@@ -19,7 +19,10 @@ var (
 var addCmd = &cobra.Command{
 	Use:   "add <content>",
 	Short: "Add a personal memory",
-	Args:  cobra.ExactArgs(1),
+	Example: `  obk memory add "I prefer dark mode"
+  obk memory add "Lives in Da Nang" --category identity
+  obk memory add "Likes Go" --source chat --json`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		content := args[0]
 

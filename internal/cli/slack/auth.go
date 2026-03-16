@@ -23,6 +23,7 @@ var authCmd = &cobra.Command{
 var authLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Authenticate with a Slack workspace",
+	Example: `  obk slack auth login`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var authMode string
 
@@ -176,7 +177,10 @@ func authLoginToken() error {
 var authLogoutCmd = &cobra.Command{
 	Use:   "logout [workspace]",
 	Short: "Remove Slack credentials",
-	Args:  cobra.MaximumNArgs(1),
+	Example: `  obk slack auth logout
+  obk slack auth logout my-company
+  obk slack auth logout my-company --force`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
@@ -228,6 +232,8 @@ var authLogoutCmd = &cobra.Command{
 var authStatusCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List Slack workspace credentials",
+	Example: `  obk slack auth list
+  obk slack auth list --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

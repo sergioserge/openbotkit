@@ -22,6 +22,8 @@ type checkResult struct {
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Check the health of your obk installation",
+	Example: `  obk doctor
+  obk doctor --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, cfgErr := config.Load()
 

@@ -13,6 +13,8 @@ import (
 var channelsCmd = &cobra.Command{
 	Use:   "channels",
 	Short: "List Slack channels",
+	Example: `  obk slack channels
+  obk slack channels --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, err := loadClient()
 		if err != nil {
@@ -45,7 +47,9 @@ var channelsCmd = &cobra.Command{
 var readCmd = &cobra.Command{
 	Use:   "read <channel>",
 	Short: "Read messages from a Slack channel",
-	Args:  cobra.ExactArgs(1),
+	Example: `  obk slack read general
+  obk slack read C01ABC23DEF --limit 50`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, err := loadClient()
 		if err != nil {

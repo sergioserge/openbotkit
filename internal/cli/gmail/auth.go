@@ -24,6 +24,8 @@ var authCmd = &cobra.Command{
 var authLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Authenticate a Google account via OAuth2",
+	Example: `  obk gmail auth login --scopes gmail.readonly
+  obk gmail auth login --scopes gmail.modify,calendar --email user@example.com`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
@@ -66,6 +68,8 @@ var authLoginCmd = &cobra.Command{
 var authRevokeCmd = &cobra.Command{
 	Use:   "revoke",
 	Short: "Revoke specific scopes for a Google account",
+	Example: `  obk gmail auth revoke --email user@example.com --scopes gmail.readonly
+  obk gmail auth revoke --email user@example.com --scopes gmail.modify,calendar --force`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		emailFlag, _ := cmd.Flags().GetString("email")
 		scopeStr, _ := cmd.Flags().GetString("scopes")
@@ -112,6 +116,8 @@ var authRevokeCmd = &cobra.Command{
 var authStatusCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List authenticated Google accounts and scopes",
+	Example: `  obk gmail auth list
+  obk gmail auth list --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

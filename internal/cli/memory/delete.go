@@ -13,7 +13,9 @@ import (
 var deleteCmd = &cobra.Command{
 	Use:   "delete <id>",
 	Short: "Delete a personal memory",
-	Args:  cobra.ExactArgs(1),
+	Example: `  obk memory delete 3
+  obk memory delete 7 --force`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {

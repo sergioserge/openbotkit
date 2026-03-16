@@ -26,6 +26,8 @@ import (
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show status of all configured data sources",
+	Example: `  obk status
+  obk status --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

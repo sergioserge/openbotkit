@@ -15,6 +15,9 @@ import (
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync emails from Gmail into local storage",
+	Example: `  obk gmail sync
+  obk gmail sync --account user@example.com --days 30
+  obk gmail sync --full --after 2025/01/01 --download-attachments`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

@@ -17,6 +17,9 @@ var listCategory string
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List personal memories",
+	Example: `  obk memory list
+  obk memory list --category identity
+  obk memory list --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

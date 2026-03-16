@@ -57,6 +57,7 @@ var serviceRunCmd = &cobra.Command{
 var serviceInstallCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install obk as a system service",
+	Example: `  obk service install`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mgr, err := service.NewManager("daemon")
 		if err != nil {
@@ -80,6 +81,8 @@ var serviceInstallCmd = &cobra.Command{
 var serviceUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "Uninstall the obk system service",
+	Example: `  obk service uninstall
+  obk service uninstall --force`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
@@ -109,6 +112,7 @@ var serviceUninstallCmd = &cobra.Command{
 var serviceStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Check the service status",
+	Example: `  obk service status`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mgr, err := service.NewManager("daemon")
 		if err != nil {
@@ -128,6 +132,7 @@ var serviceStatusCmd = &cobra.Command{
 var serviceStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the obk service",
+	Example: `  obk service start`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mgr, err := service.NewManager("daemon")
 		if err != nil {
@@ -146,6 +151,7 @@ var serviceStartCmd = &cobra.Command{
 var serviceStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop the obk service",
+	Example: `  obk service stop`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mgr, err := service.NewManager("daemon")
 		if err != nil {
@@ -164,6 +170,7 @@ var serviceStopCmd = &cobra.Command{
 var serviceRestartCmd = &cobra.Command{
 	Use:   "restart",
 	Short: "Restart the obk service",
+	Example: `  obk service restart`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mgr, err := service.NewManager("daemon")
 		if err != nil {
