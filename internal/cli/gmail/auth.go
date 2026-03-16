@@ -99,8 +99,8 @@ var authRevokeCmd = &cobra.Command{
 }
 
 var authStatusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show Google account authentication status",
+	Use:   "list",
+	Short: "List authenticated Google accounts and scopes",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

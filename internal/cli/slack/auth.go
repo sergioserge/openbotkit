@@ -213,8 +213,8 @@ var authLogoutCmd = &cobra.Command{
 }
 
 var authStatusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show Slack authentication status",
+	Use:   "list",
+	Short: "List Slack workspace credentials",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

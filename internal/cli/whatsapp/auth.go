@@ -81,8 +81,8 @@ var authLogoutCmd = &cobra.Command{
 }
 
 var authStatusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show WhatsApp authentication status",
+	Use:   "list",
+	Short: "List WhatsApp authentication status",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
