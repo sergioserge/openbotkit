@@ -44,6 +44,36 @@ func TestCheckDatabases_NoneExist(t *testing.T) {
 	}
 }
 
+func TestCheckDatabases_AllExpectedNamesPresent(t *testing.T) {
+	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
+	cfg := config.Default()
+	results := checkDatabases(cfg)
+
+	expected := map[string]bool{
+		"Gmail DB":      false,
+		"WhatsApp DB":   false,
+		"History DB":    false,
+		"UserMemory DB": false,
+		"AppleNotes DB": false,
+		"Contacts DB":   false,
+		"WebSearch DB":  false,
+		"iMessage DB":   false,
+		"Scheduler DB":  false,
+		"Audit DB":      false,
+		"Jobs DB":       false,
+	}
+	for _, r := range results {
+		if _, ok := expected[r.Name]; ok {
+			expected[r.Name] = true
+		}
+	}
+	for name, found := range expected {
+		if !found {
+			t.Errorf("missing database check: %s", name)
+		}
+	}
+}
+
 func TestCheckDatabases_SomeExist(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("OBK_CONFIG_DIR", dir)
