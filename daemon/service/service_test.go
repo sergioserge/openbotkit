@@ -49,6 +49,23 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
+func TestShellescape(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"/usr/local/bin/obk", "'/usr/local/bin/obk'"},
+		{"service", "'service'"},
+		{"/path with spaces/obk", "'/path with spaces/obk'"},
+		{"it's", `'it'\''s'`},
+	}
+	for _, tt := range tests {
+		got := shellescape(tt.in)
+		if got != tt.want {
+			t.Errorf("shellescape(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestNewManager(t *testing.T) {
 	mgr, err := NewManager("daemon")
 
