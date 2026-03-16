@@ -2,7 +2,9 @@ package slack
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 
@@ -221,13 +223,25 @@ var authStatusCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
+		jsonOut, _ := cmd.Flags().GetBool("json")
+
 		if cfg.Slack == nil || len(cfg.Slack.Workspaces) == 0 {
+			if jsonOut {
+				return json.NewEncoder(os.Stdout).Encode([]any{})
+			}
 			fmt.Println("No Slack workspaces configured.")
 			fmt.Println("Run: obk slack auth login")
 			return nil
 		}
 
-		fmt.Printf("Default workspace: %s\n\n", cfg.Slack.DefaultWorkspace)
+		type wsInfo struct {
+			Name     string `json:"name"`
+			TeamName string `json:"team_name"`
+			AuthMode string `json:"auth_mode"`
+			Status   string `json:"status"`
+			Default  bool   `json:"default"`
+		}
+		var workspaces []wsInfo
 
 		for name, ws := range cfg.Slack.Workspaces {
 			creds, err := slacksrc.LoadCredentials(name)
@@ -240,18 +254,30 @@ var authStatusCmd = &cobra.Command{
 					status = fmt.Sprintf("invalid (%v)", err)
 				}
 			}
+			workspaces = append(workspaces, wsInfo{
+				Name: name, TeamName: ws.TeamName, AuthMode: ws.AuthMode,
+				Status: status, Default: name == cfg.Slack.DefaultWorkspace,
+			})
+		}
 
+		if jsonOut {
+			return json.NewEncoder(os.Stdout).Encode(workspaces)
+		}
+
+		fmt.Printf("Default workspace: %s\n\n", cfg.Slack.DefaultWorkspace)
+		for _, ws := range workspaces {
 			marker := " "
-			if name == cfg.Slack.DefaultWorkspace {
+			if ws.Default {
 				marker = "*"
 			}
-			fmt.Printf(" %s %s (team: %s, auth: %s) — %s\n", marker, name, ws.TeamName, ws.AuthMode, status)
+			fmt.Printf(" %s %s (team: %s, auth: %s) — %s\n", marker, ws.Name, ws.TeamName, ws.AuthMode, ws.Status)
 		}
 		return nil
 	},
 }
 
 func init() {
+	authStatusCmd.Flags().Bool("json", false, "Output as JSON")
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)
 	authCmd.AddCommand(authStatusCmd)

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -30,9 +31,47 @@ var configProfilesListCmd = &cobra.Command{
 			activeProfile = cfg.Models.Profile
 		}
 
+		jsonOut, _ := cmd.Flags().GetBool("json")
+		if jsonOut {
+			type profileJSON struct {
+				Name      string   `json:"name"`
+				Label     string   `json:"label"`
+				Category  string   `json:"category"`
+				Providers []string `json:"providers"`
+				Active    bool     `json:"active"`
+				Custom    bool     `json:"custom"`
+			}
+			var profiles []profileJSON
+			for _, name := range config.ProfileNames {
+				p := config.Profiles[name]
+				profiles = append(profiles, profileJSON{
+					Name: name, Label: p.Label, Category: p.Category,
+					Providers: p.Providers, Active: name == activeProfile,
+				})
+			}
+			if cfg.Models != nil {
+				var names []string
+				for n := range cfg.Models.CustomProfiles {
+					names = append(names, n)
+				}
+				sort.Strings(names)
+				for _, name := range names {
+					cp := cfg.Models.CustomProfiles[name]
+					label := cp.Label
+					if label == "" {
+						label = name
+					}
+					profiles = append(profiles, profileJSON{
+						Name: name, Label: label, Category: "custom",
+						Providers: cp.Providers, Active: name == activeProfile, Custom: true,
+					})
+				}
+			}
+			return json.NewEncoder(os.Stdout).Encode(profiles)
+		}
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
-		// Built-in: singles first, then multis.
 		fmt.Println("Built-in profiles:")
 		fmt.Fprintln(w, "  \tNAME\tLABEL\tPROVIDERS")
 		for _, name := range config.ProfileNames {
@@ -45,7 +84,6 @@ var configProfilesListCmd = &cobra.Command{
 		}
 		w.Flush()
 
-		// Custom profiles.
 		if cfg.Models != nil && len(cfg.Models.CustomProfiles) > 0 {
 			var names []string
 			for n := range cfg.Models.CustomProfiles {
@@ -329,6 +367,7 @@ var configProfilesDeleteCmd = &cobra.Command{
 }
 
 func init() {
+	configProfilesListCmd.Flags().Bool("json", false, "Output as JSON")
 	configProfilesCmd.AddCommand(configProfilesListCmd)
 	configProfilesCmd.AddCommand(configProfilesShowCmd)
 	configProfilesCmd.AddCommand(configProfilesCreateCmd)

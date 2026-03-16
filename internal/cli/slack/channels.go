@@ -3,6 +3,8 @@ package slack
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"text/tabwriter"
 
 	slacksrc "github.com/priyanshujain/openbotkit/source/slack"
 	"github.com/spf13/cobra"
@@ -22,12 +24,21 @@ var channelsCmd = &cobra.Command{
 			return fmt.Errorf("list channels: %w", err)
 		}
 
-		fmt.Printf("Found %d channels:\n\n", len(channels))
-		for _, ch := range channels {
-			data, _ := json.MarshalIndent(ch, "", "  ")
-			fmt.Println(string(data))
+		jsonOut, _ := cmd.Flags().GetBool("json")
+		if jsonOut {
+			return json.NewEncoder(os.Stdout).Encode(channels)
 		}
-		return nil
+
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "ID\tNAME\tMEMBERS\tTOPIC")
+		for _, ch := range channels {
+			topic := ""
+			if ch.Topic != nil {
+				topic = ch.Topic.Value
+			}
+			fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", ch.ID, ch.Name, ch.NumMembers, topic)
+		}
+		return w.Flush()
 	},
 }
 
@@ -67,5 +78,6 @@ var readCmd = &cobra.Command{
 }
 
 func init() {
+	channelsCmd.Flags().Bool("json", false, "Output as JSON")
 	readCmd.Flags().IntP("limit", "l", 20, "Number of messages to fetch")
 }

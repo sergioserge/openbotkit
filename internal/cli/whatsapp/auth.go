@@ -2,7 +2,9 @@ package whatsapp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -89,20 +91,32 @@ var authStatusCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
+		jsonOut, _ := cmd.Flags().GetBool("json")
+
 		ctx := context.Background()
 		client, err := wasrc.NewClient(ctx, cfg.WhatsAppSessionDBPath())
 		if err != nil {
+			if jsonOut {
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{"authenticated": false})
+			}
 			fmt.Println("Not authenticated (no session found).")
 			return nil
 		}
 		defer client.Disconnect()
 
 		if !client.IsAuthenticated() {
+			if jsonOut {
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{"authenticated": false})
+			}
 			fmt.Println("Not authenticated.")
 			return nil
 		}
 
-		fmt.Printf("Authenticated as %s\n", client.WM().Store.ID.User)
+		user := client.WM().Store.ID.User
+		if jsonOut {
+			return json.NewEncoder(os.Stdout).Encode(map[string]any{"authenticated": true, "user": user})
+		}
+		fmt.Printf("Authenticated as %s\n", user)
 		return nil
 	},
 }
@@ -132,6 +146,7 @@ func authLoginRemote(cfg *config.Config) error {
 }
 
 func init() {
+	authStatusCmd.Flags().Bool("json", false, "Output as JSON")
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)
 	authCmd.AddCommand(authStatusCmd)

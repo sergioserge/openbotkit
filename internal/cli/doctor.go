@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -13,9 +14,9 @@ import (
 )
 
 type checkResult struct {
-	Name   string
-	Status string // "OK", "FAIL", "WARN"
-	Detail string
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Detail string `json:"detail"`
 }
 
 var doctorCmd = &cobra.Command{
@@ -34,6 +35,11 @@ var doctorCmd = &cobra.Command{
 		}
 		results = append(results, checkServices()...)
 		results = append(results, checkSkills())
+
+		jsonOut, _ := cmd.Flags().GetBool("json")
+		if jsonOut {
+			return json.NewEncoder(os.Stdout).Encode(results)
+		}
 
 		for _, r := range results {
 			fmt.Fprintf(os.Stdout, "%-20s %-6s %s\n", r.Name, r.Status, r.Detail)
@@ -166,5 +172,6 @@ func checkSkills() checkResult {
 }
 
 func init() {
+	doctorCmd.Flags().Bool("json", false, "Output as JSON")
 	rootCmd.AddCommand(doctorCmd)
 }
