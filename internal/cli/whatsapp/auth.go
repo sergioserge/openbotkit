@@ -59,6 +59,17 @@ var authLogoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Disconnect and clear WhatsApp session",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Print("About to disconnect WhatsApp session. Continue? (y/N): ")
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "y" && confirm != "Y" {
+				fmt.Println("Cancelled.")
+				return nil
+			}
+		}
+
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
@@ -146,6 +157,7 @@ func authLoginRemote(cfg *config.Config) error {
 }
 
 func init() {
+	authLogoutCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	authStatusCmd.Flags().Bool("json", false, "Output as JSON")
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)

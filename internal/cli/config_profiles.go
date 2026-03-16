@@ -335,6 +335,17 @@ var configProfilesDeleteCmd = &cobra.Command{
 			return fmt.Errorf("cannot delete built-in profile %q", name)
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Printf("About to delete profile %q. Continue? (y/N): ", name)
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "y" && confirm != "Y" {
+				fmt.Println("Cancelled.")
+				return nil
+			}
+		}
+
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
@@ -352,7 +363,6 @@ var configProfilesDeleteCmd = &cobra.Command{
 			cfg.Models.CustomProfiles = nil
 		}
 
-		// Clear active profile if it was the deleted one.
 		if cfg.Models.Profile == name {
 			cfg.Models.Profile = ""
 		}
@@ -371,6 +381,7 @@ func init() {
 	configProfilesCmd.AddCommand(configProfilesListCmd)
 	configProfilesCmd.AddCommand(configProfilesShowCmd)
 	configProfilesCmd.AddCommand(configProfilesCreateCmd)
+	configProfilesDeleteCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	configProfilesCmd.AddCommand(configProfilesDeleteCmd)
 	configCmd.AddCommand(configProfilesCmd)
 }

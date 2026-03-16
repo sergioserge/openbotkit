@@ -20,6 +20,17 @@ var deleteCmd = &cobra.Command{
 			return fmt.Errorf("invalid id: %w", err)
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Printf("About to delete memory #%d. Continue? (y/N): ", id)
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "y" && confirm != "Y" {
+				fmt.Println("Cancelled.")
+				return nil
+			}
+		}
+
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
@@ -61,4 +72,8 @@ var deleteCmd = &cobra.Command{
 		fmt.Printf("Deleted memory #%d\n", id)
 		return nil
 	},
+}
+
+func init() {
+	deleteCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 }

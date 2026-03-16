@@ -67,13 +67,24 @@ var authRevokeCmd = &cobra.Command{
 	Use:   "revoke",
 	Short: "Revoke specific scopes for a Google account",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		emailFlag, _ := cmd.Flags().GetString("email")
+		scopeStr, _ := cmd.Flags().GetString("scopes")
+
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Printf("About to revoke scopes for %s. Continue? (y/N): ", emailFlag)
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "y" && confirm != "Y" {
+				fmt.Println("Cancelled.")
+				return nil
+			}
+		}
+
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
 		}
-
-		emailFlag, _ := cmd.Flags().GetString("email")
-		scopeStr, _ := cmd.Flags().GetString("scopes")
 
 		if emailFlag == "" {
 			return fmt.Errorf("--email is required")
@@ -359,6 +370,7 @@ func init() {
 
 	authRevokeCmd.Flags().String("email", "", "Account email to revoke scopes for")
 	authRevokeCmd.Flags().String("scopes", "", "Comma-separated scopes to revoke")
+	authRevokeCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 
 	authStatusCmd.Flags().Bool("json", false, "Output as JSON")
 

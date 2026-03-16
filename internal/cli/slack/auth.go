@@ -193,6 +193,17 @@ var authLogoutCmd = &cobra.Command{
 			return fmt.Errorf("specify a workspace name or configure a default")
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Printf("About to remove credentials for workspace %q. Continue? (y/N): ", workspace)
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "y" && confirm != "Y" {
+				fmt.Println("Cancelled.")
+				return nil
+			}
+		}
+
 		slacksrc.DeleteCredentials(workspace)
 
 		if cfg.Slack != nil {
@@ -277,6 +288,7 @@ var authStatusCmd = &cobra.Command{
 }
 
 func init() {
+	authLogoutCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	authStatusCmd.Flags().Bool("json", false, "Output as JSON")
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)

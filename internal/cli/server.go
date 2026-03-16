@@ -70,6 +70,17 @@ var serverUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "Uninstall the server system service",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Print("About to uninstall the server service. Continue? (y/N): ")
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "y" && confirm != "Y" {
+				fmt.Println("Cancelled.")
+				return nil
+			}
+		}
+
 		mgr, err := service.NewManager("server")
 		if err != nil {
 			return err
@@ -165,6 +176,7 @@ func init() {
 	serverRunCmd.Flags().StringVar(&serverAddr, "addr", ":8443", "address to listen on")
 	serverCmd.AddCommand(serverRunCmd)
 	serverCmd.AddCommand(serverInstallCmd)
+	serverUninstallCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	serverCmd.AddCommand(serverUninstallCmd)
 	serverCmd.AddCommand(serverStartCmd)
 	serverCmd.AddCommand(serverStopCmd)

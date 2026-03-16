@@ -81,6 +81,17 @@ var serviceUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "Uninstall the obk system service",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Print("About to uninstall the obk service. Continue? (y/N): ")
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "y" && confirm != "Y" {
+				fmt.Println("Cancelled.")
+				return nil
+			}
+		}
+
 		mgr, err := service.NewManager("daemon")
 		if err != nil {
 			return err
@@ -176,6 +187,7 @@ func init() {
 	serviceRunCmd.Flags().BoolVar(&bridgeMode, "bridge", false, "run in bridge mode (sync Apple Notes to remote)")
 	serviceCmd.AddCommand(serviceRunCmd)
 	serviceCmd.AddCommand(serviceInstallCmd)
+	serviceUninstallCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	serviceCmd.AddCommand(serviceUninstallCmd)
 	serviceCmd.AddCommand(serviceStartCmd)
 	serviceCmd.AddCommand(serviceStopCmd)
