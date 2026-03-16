@@ -152,15 +152,6 @@ var statusCmd = &cobra.Command{
 				if db != nil {
 					wssrc.Migrate(db)
 				}
-			case "contacts":
-				dsn := cfg.ContactsDataDSN()
-				db, _ = store.Open(store.Config{
-					Driver: cfg.Contacts.Storage.Driver,
-					DSN:    dsn,
-				})
-				if db != nil {
-					contactsrc.Migrate(db)
-				}
 			}
 
 			st, err := s.Status(ctx, db)
@@ -185,6 +176,22 @@ var statusCmd = &cobra.Command{
 				Accounts:  len(st.Accounts),
 				Items:     st.ItemCount,
 				LastSync:  lastSync,
+			})
+		}
+
+		// Contacts is a cross-cutting store (populated by gmail, whatsapp,
+		// imessage syncs), not a standalone source. Report its count separately.
+		if cdb, err := store.Open(store.Config{
+			Driver: cfg.Contacts.Storage.Driver,
+			DSN:    cfg.ContactsDataDSN(),
+		}); err == nil {
+			contactsrc.Migrate(cdb)
+			count, _ := contactsrc.CountContacts(cdb)
+			cdb.Close()
+			statuses = append(statuses, sourceStatus{
+				Name:      "contacts",
+				Connected: count > 0,
+				Items:     count,
 			})
 		}
 
