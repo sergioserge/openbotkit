@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"runtime"
 	"sort"
 	"testing"
 	"time"
@@ -92,6 +93,9 @@ func TestLinkedSources_ExcludesAppleContactsWhenNotLinked(t *testing.T) {
 }
 
 func TestMigrateContactsLinking(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("migrateContactsLinking only runs on macOS")
+	}
 	tmpDir := t.TempDir()
 	t.Setenv("OBK_CONFIG_DIR", tmpDir)
 
@@ -120,6 +124,9 @@ func TestMigrateContactsLinking_NoOp(t *testing.T) {
 }
 
 func TestMigrateContactsLinking_AlreadyMigrated(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("migrateContactsLinking only runs on macOS")
+	}
 	tmpDir := t.TempDir()
 	t.Setenv("OBK_CONFIG_DIR", tmpDir)
 
