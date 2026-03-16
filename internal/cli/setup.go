@@ -31,7 +31,7 @@ var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Guided first-time setup for OpenBotKit",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := tty.RequireInteractive("configure manually with 'obk config' and 'obk auth google login'"); err != nil {
+		if err := tty.RequireInteractive("configure manually with 'obk config' and 'obk gmail auth login'"); err != nil {
 			return err
 		}
 
@@ -175,7 +175,7 @@ var setupCmd = &cobra.Command{
 					return fmt.Errorf("create whatsapp dir: %w", err)
 				}
 				fmt.Println("\n  WhatsApp requires QR code login.")
-				fmt.Println("  Run after setup: obk auth whatsapp login")
+				fmt.Println("  Run after setup: obk whatsapp auth login")
 			case "slack":
 				if err := setupSlack(cfg); err != nil {
 					return err
@@ -232,7 +232,7 @@ var setupCmd = &cobra.Command{
 			case "gmail":
 				fmt.Println("    - Run: obk gmail sync")
 			case "whatsapp":
-				fmt.Println("    - Run: obk auth whatsapp login")
+				fmt.Println("    - Run: obk whatsapp auth login")
 			case "applenotes":
 				fmt.Println("    - Apple Notes is ready (synced during setup)")
 			case "applecontacts":
@@ -707,7 +707,7 @@ func setupSlack(cfg *config.Config) error {
 		fmt.Println("  Falling back to manual token entry.")
 	}
 
-	fmt.Println("  Run: obk auth slack login")
+	fmt.Println("  Run: obk slack auth login")
 	return nil
 }
 

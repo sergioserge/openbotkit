@@ -33,7 +33,7 @@ var configInitCmd = &cobra.Command{
 		fmt.Printf("Config created at %s\n", path)
 		fmt.Println("\nNext steps:")
 		fmt.Printf("  1. Place your Google OAuth credentials at %s\n", cfg.GoogleCredentialsFile())
-		fmt.Println("  2. Run: obk auth google login --scopes gmail.readonly")
+		fmt.Println("  2. Run: obk gmail auth login --scopes gmail.readonly")
 		return nil
 	},
 }
