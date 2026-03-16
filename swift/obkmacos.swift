@@ -181,8 +181,8 @@ func fetchNotes() {
             "title": fields[1].trimmingCharacters(in: .whitespacesAndNewlines),
             "body": fields[5].trimmingCharacters(in: .whitespacesAndNewlines),
             "passwordProtected": fields[4].trimmingCharacters(in: .whitespacesAndNewlines) == "true",
-            "createdAt": iso.string(from: modDate),
-            "modifiedAt": iso.string(from: createdDate),
+            "createdAt": iso.string(from: createdDate),
+            "modifiedAt": iso.string(from: modDate),
         ])
     }
 
