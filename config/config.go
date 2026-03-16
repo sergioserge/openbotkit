@@ -51,9 +51,21 @@ func (c *Config) IsRemote() bool { return c.ResolvedMode() == ModeRemote }
 func (c *Config) IsServer() bool { return c.ResolvedMode() == ModeServer }
 
 type RemoteConfig struct {
-	Server   string `yaml:"server,omitempty"`
-	Username string `yaml:"username,omitempty"`
-	Password string `yaml:"password,omitempty"`
+	Server      string `yaml:"server,omitempty"`
+	Username    string `yaml:"username,omitempty"`
+	Password    string `yaml:"password,omitempty"`
+	PasswordRef string `yaml:"password_ref,omitempty"`
+}
+
+// ResolvedPassword tries PasswordRef first (via the supplied resolver),
+// falling back to the plain-text Password field.
+func (r *RemoteConfig) ResolvedPassword(resolve func(string) (string, error)) string {
+	if r.PasswordRef != "" && resolve != nil {
+		if pw, err := resolve(r.PasswordRef); err == nil && pw != "" {
+			return pw
+		}
+	}
+	return r.Password
 }
 
 type AuthConfig struct {
