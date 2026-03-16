@@ -132,6 +132,7 @@ type WhatsAppConfig struct {
 type GmailConfig struct {
 	CredentialsFile     string        `yaml:"credentials_file,omitempty"`
 	DownloadAttachments bool          `yaml:"download_attachments,omitempty"`
+	SyncDays            int           `yaml:"sync_days,omitempty"`
 	Storage             StorageConfig `yaml:"storage,omitempty"`
 }
 
