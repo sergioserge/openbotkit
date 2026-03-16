@@ -57,6 +57,9 @@ var syncCmd = &cobra.Command{
 		full, _ := cmd.Flags().GetBool("full")
 		after, _ := cmd.Flags().GetString("after")
 		days, _ := cmd.Flags().GetInt("days")
+		if !cmd.Flags().Changed("days") && cfg.Gmail.SyncDays > 0 {
+			days = cfg.Gmail.SyncDays
+		}
 		dlAttachments, _ := cmd.Flags().GetBool("download-attachments")
 
 		attachDir := filepath.Join(config.SourceDir("gmail"), "attachments")
