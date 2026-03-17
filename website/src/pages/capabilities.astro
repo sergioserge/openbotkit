@@ -23,11 +23,16 @@ import Footer from '../components/Footer.astro';
         you interact through Telegram or the terminal. Every write action goes through approval
         gates before it executes.
       </p>
-      <img
-        src="/architecture.png"
-        alt="OpenBotKit architecture diagram showing the flow from user through channels, agent loop, safety layer, tool executor, and data sources - all stored in local SQLite"
-        class="mt-8 w-full rounded-lg border border-border"
-      />
+      <figure class="mt-8">
+        <img
+          src="/architecture.png"
+          alt="OpenBotKit architecture diagram showing the flow from user through channels, agent loop, safety layer, tool executor, and data sources - all stored in local SQLite"
+          class="w-full rounded-lg border border-border"
+        />
+        <figcaption class="mt-3 text-[1rem] text-muted">
+          How a message flows through OpenBotKit - from user input to tool execution and back.
+        </figcaption>
+      </figure>
     </section>
 
     <!-- Demo -->
@@ -39,11 +44,16 @@ import Footer from '../components/Footer.astro';
         Chat with your assistant on Telegram. It checks your calendar, sends WhatsApp messages,
         converts currencies, sets reminders - and asks before every action.
       </p>
-      <img
-        src="/demo.png"
-        alt="Telegram conversation showing OpenBotKit checking calendar availability, sending a WhatsApp message, converting currency, and setting a reminder - each with user approval"
-        class="mx-auto mt-8 w-full max-w-sm rounded-lg border border-border"
-      />
+      <figure class="mt-8">
+        <img
+          src="/demo.png"
+          alt="Telegram conversation showing OpenBotKit checking calendar availability, sending a WhatsApp message, converting currency, and setting a reminder - each with user approval"
+          class="mx-auto w-full max-w-sm rounded-lg border border-border"
+        />
+        <figcaption class="mt-3 text-center text-[1rem] text-muted">
+          <a href="https://x.com/priyanshujain_" target="_blank" rel="noopener" class="text-link hover:text-heading transition-colors">PJ</a> talking to his own bot called Anton
+        </figcaption>
+      </figure>
     </section>
 
     <!-- Integrations -->
