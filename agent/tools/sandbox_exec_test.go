@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -76,5 +77,30 @@ func TestLanguageExtension(t *testing.T) {
 		if got := languageExtension(lang); got != want {
 			t.Errorf("languageExtension(%q) = %q, want %q", lang, got, want)
 		}
+	}
+}
+
+func TestSandboxExec_RuntimeExecError(t *testing.T) {
+	mock := &mockSandboxRuntime{
+		available: true,
+		output:    "partial output\n",
+		err:       fmt.Errorf("exit status 1"),
+	}
+	tool := NewSandboxExecTool(mock)
+	input, _ := json.Marshal(sandboxExecInput{Language: "python", Code: "import sys; sys.exit(1)"})
+	out, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Error("expected error from runtime failure")
+	}
+	if !strings.Contains(out, "partial output") {
+		t.Error("should return partial output on error")
+	}
+}
+
+func TestSandboxExec_InvalidJSON(t *testing.T) {
+	tool := NewSandboxExecTool(nil)
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{bad`))
+	if err == nil || !strings.Contains(err.Error(), "parse input") {
+		t.Errorf("expected parse error, got: %v", err)
 	}
 }

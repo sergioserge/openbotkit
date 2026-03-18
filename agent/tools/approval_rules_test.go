@@ -160,3 +160,45 @@ func TestExtractPattern_BashSingleWord(t *testing.T) {
 		t.Errorf("pattern = %q, want ls", p)
 	}
 }
+
+func TestExtractPattern_FileWrite(t *testing.T) {
+	input, _ := json.Marshal(map[string]string{"path": "/tmp/test.txt", "content": "hello"})
+	if p := extractPattern("file_write", input); p != "/tmp/test.txt" {
+		t.Errorf("pattern = %q, want /tmp/test.txt", p)
+	}
+}
+
+func TestExtractPattern_FileEdit(t *testing.T) {
+	input, _ := json.Marshal(map[string]string{"path": "/tmp/test.txt", "old_string": "a", "new_string": "b"})
+	if p := extractPattern("file_edit", input); p != "/tmp/test.txt" {
+		t.Errorf("pattern = %q, want /tmp/test.txt", p)
+	}
+}
+
+func TestApprovalRuleSet_WildcardPattern(t *testing.T) {
+	s := NewApprovalRuleSet()
+	s.Add(ApprovalRule{ToolName: "bash", Pattern: ""})
+	input, _ := json.Marshal(map[string]string{"command": "anything"})
+	if !s.Matches("bash", input) {
+		t.Error("empty pattern should match any input")
+	}
+}
+
+func TestApprovalRuleSet_DuplicateRulePrevention(t *testing.T) {
+	s := NewApprovalRuleSet()
+	input, _ := json.Marshal(map[string]string{"channel": "#general"})
+	for i := 0; i < autoApproveThreshold*3; i++ {
+		s.RecordApproval("slack_send", input)
+	}
+	s.mu.Lock()
+	count := 0
+	for _, r := range s.rules {
+		if r.ToolName == "slack_send" && r.Pattern == "#general" {
+			count++
+		}
+	}
+	s.mu.Unlock()
+	if count != 1 {
+		t.Errorf("expected 1 rule, got %d (duplicate prevention failed)", count)
+	}
+}

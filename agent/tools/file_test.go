@@ -102,3 +102,67 @@ func TestFileEditTool_WithInteractor_Denied(t *testing.T) {
 		t.Error("file should be unchanged after denial")
 	}
 }
+
+func TestFileEditTool_WithInteractor_Approved(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+	os.WriteFile(path, []byte("hello world"), 0644)
+	inter := &mockInteractor{approveAll: true}
+	tool := NewFileEditTool(inter, nil)
+	input, _ := json.Marshal(map[string]string{
+		"path": path, "old_string": "world", "new_string": "go",
+	})
+	out, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(out, "replaced 1 occurrence") {
+		t.Errorf("output = %q", out)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != "hello go" {
+		t.Errorf("file content = %q, want 'hello go'", got)
+	}
+}
+
+func TestFileReadTool_NonexistentFile(t *testing.T) {
+	tool := &FileReadTool{}
+	input, _ := json.Marshal(map[string]string{"path": "/tmp/nonexistent-file-xyz"})
+	_, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Error("expected error for nonexistent file")
+	}
+}
+
+func TestFileWriteTool_InvalidJSON(t *testing.T) {
+	tool := NewFileWriteTool(nil, nil)
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{bad`))
+	if err == nil || !strings.Contains(err.Error(), "parse input") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+}
+
+func TestFileEditTool_InvalidJSON(t *testing.T) {
+	tool := NewFileEditTool(nil, nil)
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{bad`))
+	if err == nil || !strings.Contains(err.Error(), "parse input") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+}
+
+func TestFileWriteTool_WithApprovalRules(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+	rules := NewApprovalRuleSet()
+	rules.Add(ApprovalRule{ToolName: "file_write", Pattern: path})
+	inter := &mockInteractor{approveAll: false} // would deny if asked
+	tool := NewFileWriteTool(inter, rules)
+	input, _ := json.Marshal(map[string]string{"path": path, "content": "auto"})
+	out, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if out == "denied_by_user" {
+		t.Error("auto-approve rule should have bypassed denial")
+	}
+}
