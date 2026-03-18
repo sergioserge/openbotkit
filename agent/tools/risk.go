@@ -8,4 +8,3 @@ const (
 	RiskMedium                  // standard approval (current behavior)
 	RiskHigh                    // enhanced approval with full preview
 )
-

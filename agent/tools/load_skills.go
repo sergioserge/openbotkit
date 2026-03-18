@@ -14,8 +14,10 @@ import (
 // LoadSkillsTool reads full SKILL.md content for named skills.
 type LoadSkillsTool struct{}
 
-func (l *LoadSkillsTool) Name() string        { return "load_skills" }
-func (l *LoadSkillsTool) Description() string { return "Load full skill instructions for the specified skills" }
+func (l *LoadSkillsTool) Name() string { return "load_skills" }
+func (l *LoadSkillsTool) Description() string {
+	return "Load full skill instructions for the specified skills"
+}
 func (l *LoadSkillsTool) InputSchema() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",

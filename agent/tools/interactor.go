@@ -12,4 +12,3 @@ type Interactor interface {
 	// RequestApproval asks the user to approve an action. Blocks until the user responds.
 	RequestApproval(description string) (approved bool, err error)
 }
-

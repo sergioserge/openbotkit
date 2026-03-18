@@ -7,13 +7,13 @@ import (
 
 // Standard truncation limits shared across tools.
 const (
-	MaxOutputBytes     = 50 * 1024 // 50KB byte cap for all tools.
-	MaxLinesBash       = 2000      // bash: tail-truncate (errors at bottom).
-	MaxLinesFileRead   = 2000      // file_read: head-truncate.
-	MaxLinesWebFetch   = 1000      // web_fetch: head-truncate.
-	MaxLinesSlack      = 1000      // slack_*: head-truncate.
-	MaxLinesWebSearch  = 500       // web_search: head-truncate.
-	MaxLinesHeadTail   = 500       // gws/subagent/delegate: head+tail.
+	MaxOutputBytes    = 50 * 1024 // 50KB byte cap for all tools.
+	MaxLinesBash      = 2000      // bash: tail-truncate (errors at bottom).
+	MaxLinesFileRead  = 2000      // file_read: head-truncate.
+	MaxLinesWebFetch  = 1000      // web_fetch: head-truncate.
+	MaxLinesSlack     = 1000      // slack_*: head-truncate.
+	MaxLinesWebSearch = 500       // web_search: head-truncate.
+	MaxLinesHeadTail  = 500       // gws/subagent/delegate: head+tail.
 )
 
 // TruncateHead keeps the first maxLines lines (for file_read, web results).

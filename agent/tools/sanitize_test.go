@@ -131,9 +131,9 @@ func TestNormalizeHomoglyphs(t *testing.T) {
 		want  string
 	}{
 		{"hello", "hello"},
-		{"\u0430bc", "abc"},                       // Cyrillic a → a
-		{"te\u200bst", "test"},                     // zero-width space removed
-		{"\u0456gnore", "ignore"},                  // Cyrillic і → i
+		{"\u0430bc", "abc"},       // Cyrillic a → a
+		{"te\u200bst", "test"},    // zero-width space removed
+		{"\u0456gnore", "ignore"}, // Cyrillic і → i
 	}
 	for _, tc := range cases {
 		if got := normalizeHomoglyphs(tc.input); got != tc.want {
