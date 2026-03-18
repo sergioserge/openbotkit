@@ -24,7 +24,7 @@ import (
 	ansrc "github.com/73ai/openbotkit/source/applenotes"
 	contactsrc "github.com/73ai/openbotkit/source/contacts"
 	gmailsrc "github.com/73ai/openbotkit/source/gmail"
-	historysrc "github.com/73ai/openbotkit/source/history"
+	historysrc "github.com/73ai/openbotkit/service/history"
 	imsrc "github.com/73ai/openbotkit/source/imessage"
 	schedsrc "github.com/73ai/openbotkit/service/scheduler"
 	usagesrc "github.com/73ai/openbotkit/service/usage"

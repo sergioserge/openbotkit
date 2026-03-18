@@ -14,7 +14,7 @@ import (
 	contactsrc "github.com/73ai/openbotkit/source/contacts"
 	finsrc "github.com/73ai/openbotkit/source/finance"
 	gmailsrc "github.com/73ai/openbotkit/source/gmail"
-	historysrc "github.com/73ai/openbotkit/source/history"
+	historysrc "github.com/73ai/openbotkit/service/history"
 	imsrc "github.com/73ai/openbotkit/source/imessage"
 	wasrc "github.com/73ai/openbotkit/source/whatsapp"
 	slacksrc "github.com/73ai/openbotkit/source/slack"
@@ -65,9 +65,6 @@ var statusCmd = &cobra.Command{
 		})
 		source.Register(wa)
 
-		hist := historysrc.New(historysrc.Config{})
-		source.Register(hist)
-
 		an := ansrc.New(ansrc.Config{})
 		source.Register(an)
 
@@ -115,15 +112,6 @@ var statusCmd = &cobra.Command{
 				})
 				if db != nil {
 					wasrc.Migrate(db)
-				}
-			case "history":
-				dsn := cfg.HistoryDataDSN()
-				db, _ = store.Open(store.Config{
-					Driver: cfg.History.Storage.Driver,
-					DSN:    dsn,
-				})
-				if db != nil {
-					historysrc.Migrate(db)
 				}
 			case "applenotes":
 				dsn := cfg.AppleNotesDataDSN()
@@ -192,6 +180,29 @@ var statusCmd = &cobra.Command{
 				Name:      "contacts",
 				Connected: count > 0,
 				Items:     count,
+			})
+		}
+
+		// History is a derived store (captures from chat sessions),
+		// not a standalone source. Report its count separately.
+		if hdb, err := store.Open(store.Config{
+			Driver: cfg.History.Storage.Driver,
+			DSN:    cfg.HistoryDataDSN(),
+		}); err == nil {
+			historysrc.Migrate(hdb)
+			count, _ := historysrc.CountConversations(hdb)
+			lastCapture, _ := historysrc.LastCaptureTime(hdb)
+			hdb.Close()
+			var lastSync *string
+			if lastCapture != nil {
+				ts := lastCapture.Format("2006-01-02 15:04")
+				lastSync = &ts
+			}
+			statuses = append(statuses, sourceStatus{
+				Name:      "history",
+				Connected: count > 0,
+				Items:     count,
+				LastSync:  lastSync,
 			})
 		}
 
