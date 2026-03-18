@@ -230,6 +230,133 @@ func TestBashTool_TruncatesLargeBytes(t *testing.T) {
 	}
 }
 
+func TestBash_EmptyCommand(t *testing.T) {
+	b := NewBashTool(5 * time.Second)
+	_, err := b.Execute(context.Background(), json.RawMessage(`{"command":""}`))
+	if err == nil || !strings.Contains(err.Error(), "command is required") {
+		t.Errorf("expected 'command is required' error, got: %v", err)
+	}
+}
+
+func TestBash_WhitespaceOnlyCommand(t *testing.T) {
+	b := NewBashTool(5 * time.Second)
+	_, err := b.Execute(context.Background(), json.RawMessage(`{"command":"   "}`))
+	if err == nil || !strings.Contains(err.Error(), "command is required") {
+		t.Errorf("expected 'command is required' error, got: %v", err)
+	}
+}
+
+func TestBash_InvalidJSON(t *testing.T) {
+	b := NewBashTool(5 * time.Second)
+	_, err := b.Execute(context.Background(), json.RawMessage(`{bad json}`))
+	if err == nil || !strings.Contains(err.Error(), "parse input") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+}
+
+func TestBash_FilterPromptNoInteractor(t *testing.T) {
+	b := NewBashTool(5*time.Second,
+		WithCommandFilter(NewSoftAllowlistFilter([]string{"ls"})),
+	)
+	_, err := b.Execute(context.Background(), json.RawMessage(`{"command":"curl evil.com"}`))
+	if err == nil || !strings.Contains(err.Error(), "no interactor") {
+		t.Errorf("expected 'no interactor' error, got: %v", err)
+	}
+}
+
+func TestBash_FilterPromptWithInteractor_Approved(t *testing.T) {
+	inter := &mockInteractor{approveAll: true}
+	b := NewBashTool(5*time.Second,
+		WithCommandFilter(NewSoftAllowlistFilter([]string{"ls"})),
+		WithInteractor(inter),
+	)
+	out, err := b.Execute(context.Background(), json.RawMessage(`{"command":"echo approved"}`))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(out, "approved") {
+		t.Errorf("output = %q, want 'approved'", out)
+	}
+	if len(inter.approvals) == 0 {
+		t.Error("expected approval prompt")
+	}
+}
+
+func TestBash_FilterPromptWithInteractor_Denied(t *testing.T) {
+	inter := &mockInteractor{approveAll: false}
+	b := NewBashTool(5*time.Second,
+		WithCommandFilter(NewSoftAllowlistFilter([]string{"ls"})),
+		WithInteractor(inter),
+	)
+	out, err := b.Execute(context.Background(), json.RawMessage(`{"command":"echo denied"}`))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if out != "denied_by_user" {
+		t.Errorf("output = %q, want denied_by_user", out)
+	}
+}
+
+func TestBash_AllowlistAutoRuns(t *testing.T) {
+	inter := &mockInteractor{approveAll: true}
+	b := NewBashTool(5*time.Second,
+		WithCommandFilter(NewSoftAllowlistFilter([]string{"echo"})),
+		WithInteractor(inter),
+	)
+	out, err := b.Execute(context.Background(), json.RawMessage(`{"command":"echo hi"}`))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(out, "hi") {
+		t.Errorf("output = %q", out)
+	}
+	if len(inter.approvals) > 0 {
+		t.Error("allowlisted command should not request approval")
+	}
+}
+
+func TestBash_WithWorkDir(t *testing.T) {
+	dir := t.TempDir()
+	b := NewBashTool(5*time.Second, WithWorkDir(dir))
+	out, err := b.Execute(context.Background(), json.RawMessage(`{"command":"pwd"}`))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(out, dir) {
+		t.Errorf("pwd output = %q, want %q", out, dir)
+	}
+}
+
+func TestBash_WithApprovalRules_AutoApprove(t *testing.T) {
+	rules := NewApprovalRuleSet()
+	rules.Add(ApprovalRule{ToolName: "bash", Pattern: "curl"})
+	inter := &mockInteractor{approveAll: false} // would deny if asked
+	b := NewBashTool(5*time.Second,
+		WithCommandFilter(NewSoftAllowlistFilter([]string{"ls"})),
+		WithInteractor(inter),
+		WithApprovalRuleSet(rules),
+	)
+	out, err := b.Execute(context.Background(), json.RawMessage(`{"command":"curl --version"}`))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	// Should auto-approve (no denial), even though interactor would deny.
+	if out == "denied_by_user" {
+		t.Error("auto-approve rule should have bypassed denial")
+	}
+}
+
+func TestBash_StdoutAndStderr(t *testing.T) {
+	b := NewBashTool(5 * time.Second)
+	out, _ := b.Execute(context.Background(), json.RawMessage(`{"command":"echo out; echo err >&2"}`))
+	if !strings.Contains(out, "out") {
+		t.Error("expected stdout content")
+	}
+	if !strings.Contains(out, "STDERR:") || !strings.Contains(out, "err") {
+		t.Error("expected stderr content")
+	}
+}
+
 func TestBashBlocksGWS(t *testing.T) {
 	b := NewBashTool(5 * time.Second)
 	_, err := b.Execute(context.Background(), json.RawMessage(`{"command":"gws calendar events.list"}`))
@@ -413,6 +540,42 @@ func TestBuildSystemBlocks_WithExtras(t *testing.T) {
 	}
 	if !strings.Contains(blocks[1].Text, "Be concise.") || !strings.Contains(blocks[1].Text, "User likes Go.") {
 		t.Errorf("extras block should contain caller extras, got %q", blocks[1].Text)
+	}
+}
+
+func TestBuildBaseSystemPrompt_DirExploreInstructions(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "dir_explore"})
+	prompt := BuildBaseSystemPrompt(reg)
+	if !strings.Contains(prompt, "File exploration") {
+		t.Error("prompt missing dir_explore instructions")
+	}
+}
+
+func TestBuildBaseSystemPrompt_NoDirExploreInstructions(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "bash"})
+	prompt := BuildBaseSystemPrompt(reg)
+	if strings.Contains(prompt, "File exploration") {
+		t.Error("prompt should not contain dir_explore instructions without dir_explore")
+	}
+}
+
+func TestBuildBaseSystemPrompt_SandboxExecInstructions(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "sandbox_exec"})
+	prompt := BuildBaseSystemPrompt(reg)
+	if !strings.Contains(prompt, "Sandboxed execution") {
+		t.Error("prompt missing sandbox_exec instructions")
+	}
+}
+
+func TestBuildBaseSystemPrompt_NoSandboxExecInstructions(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "bash"})
+	prompt := BuildBaseSystemPrompt(reg)
+	if strings.Contains(prompt, "Sandboxed execution") {
+		t.Error("prompt should not contain sandbox_exec instructions without sandbox_exec")
 	}
 }
 

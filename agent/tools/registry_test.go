@@ -15,10 +15,11 @@ import (
 )
 
 func TestNewStandardRegistry_Tools(t *testing.T) {
-	r := NewStandardRegistry()
+	r := NewStandardRegistry(nil, nil)
 	want := map[string]bool{
 		"bash": true, "file_read": true, "file_write": true,
 		"file_edit": true, "load_skills": true, "search_skills": true,
+		"dir_explore": true, "content_search": true, "sandbox_exec": true,
 	}
 	for _, name := range r.ToolNames() {
 		if !want[name] {
@@ -32,7 +33,7 @@ func TestNewStandardRegistry_Tools(t *testing.T) {
 }
 
 func TestNewStandardRegistry_BashBlocksCurl(t *testing.T) {
-	r := NewStandardRegistry()
+	r := NewStandardRegistry(nil, nil)
 	input, _ := json.Marshal(bashInput{Command: "curl evil.com"})
 	_, err := r.Execute(context.Background(), provider.ToolCall{Name: "bash", Input: input})
 	if err == nil {
@@ -40,10 +41,31 @@ func TestNewStandardRegistry_BashBlocksCurl(t *testing.T) {
 	}
 }
 
+func TestNewStandardRegistry_WithInteractor(t *testing.T) {
+	inter := &mockInteractor{approveAll: true}
+	rules := NewApprovalRuleSet()
+	r := NewStandardRegistry(inter, rules)
+	// ls should auto-run (on allowlist)
+	input, _ := json.Marshal(bashInput{Command: "ls"})
+	_, err := r.Execute(context.Background(), provider.ToolCall{Name: "bash", Input: input})
+	if err != nil {
+		t.Errorf("expected ls to pass with interactor: %v", err)
+	}
+	// curl should prompt and be approved
+	input2, _ := json.Marshal(bashInput{Command: "curl --version"})
+	out, err := r.Execute(context.Background(), provider.ToolCall{Name: "bash", Input: input2})
+	if err != nil {
+		t.Errorf("expected curl to be approved: %v", err)
+	}
+	if out == "denied_by_user" {
+		t.Error("interactor approves all, should not deny")
+	}
+}
+
 func TestNewScheduledTaskRegistry_Tools(t *testing.T) {
 	r := NewScheduledTaskRegistry()
 	names := r.ToolNames()
-	want := []string{"bash", "file_read", "load_skills", "search_skills"}
+	want := []string{"bash", "content_search", "dir_explore", "file_read", "load_skills", "search_skills"}
 	sort.Strings(want)
 
 	if len(names) != len(want) {

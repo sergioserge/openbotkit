@@ -34,6 +34,24 @@ Rules:
 - If a tool call fails, analyze the error before retrying with a different approach.
 `)
 
+	// Tier guidance.
+	if reg.Has("dir_explore") {
+		b.WriteString(`
+## File exploration
+Use dir_explore (ls, tree, find, glob) to explore directories and find files. No approval needed.
+Use content_search to search file contents by regex. No approval needed.
+Prefer these over bash for read-only exploration — they are faster and safer.
+`)
+	}
+	if reg.Has("sandbox_exec") {
+		b.WriteString(`
+## Sandboxed execution
+Use sandbox_exec to run untrusted or experimental code (python, bash, node, ruby).
+The sandbox has read-only filesystem access and no network. No approval needed.
+Use this instead of bash when the code doesn't need to modify files or access the network.
+`)
+	}
+
 	// Safety rules.
 	b.WriteString(`
 ## Safety
