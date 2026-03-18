@@ -80,6 +80,7 @@ func (b *BashTool) Execute(ctx context.Context, input json.RawMessage) (string, 
 	if err := json.Unmarshal(input, &in); err != nil {
 		return "", fmt.Errorf("parse input: %w", err)
 	}
+	in.Command = strings.TrimSpace(in.Command)
 	if in.Command == "" {
 		return "", fmt.Errorf("command is required")
 	}

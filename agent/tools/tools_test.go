@@ -238,6 +238,14 @@ func TestBash_EmptyCommand(t *testing.T) {
 	}
 }
 
+func TestBash_WhitespaceOnlyCommand(t *testing.T) {
+	b := NewBashTool(5 * time.Second)
+	_, err := b.Execute(context.Background(), json.RawMessage(`{"command":"   "}`))
+	if err == nil || !strings.Contains(err.Error(), "command is required") {
+		t.Errorf("expected 'command is required' error, got: %v", err)
+	}
+}
+
 func TestBash_InvalidJSON(t *testing.T) {
 	b := NewBashTool(5 * time.Second)
 	_, err := b.Execute(context.Background(), json.RawMessage(`{bad json}`))
