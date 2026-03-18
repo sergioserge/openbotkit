@@ -112,3 +112,29 @@ func TestDirExplore_UnknownAction(t *testing.T) {
 		t.Error("expected error for unknown action")
 	}
 }
+
+func TestDirExplore_NonexistentDir(t *testing.T) {
+	tool := &DirExploreTool{}
+	input, _ := json.Marshal(dirExploreInput{Action: "ls", Path: "/nonexistent-dir-xyz"})
+	_, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Error("expected error for nonexistent directory")
+	}
+}
+
+func TestDirExplore_GlobWithoutPattern(t *testing.T) {
+	tool := &DirExploreTool{}
+	input, _ := json.Marshal(dirExploreInput{Action: "glob", Path: "."})
+	_, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Error("expected error for glob without pattern")
+	}
+}
+
+func TestDirExplore_InvalidJSON(t *testing.T) {
+	tool := &DirExploreTool{}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{bad`))
+	if err == nil || !strings.Contains(err.Error(), "parse input") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+}

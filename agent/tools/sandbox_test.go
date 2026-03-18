@@ -69,3 +69,27 @@ func TestMockSandboxRuntime(t *testing.T) {
 		t.Errorf("output = %q, want %q", out, "hello\n")
 	}
 }
+
+func TestSeatbeltProfile_EmptyWorkDir(t *testing.T) {
+	profile := seatbeltProfile("", "/tmp/sandbox")
+	if !strings.Contains(profile, "/tmp") {
+		t.Error("empty workDir should fall back to /tmp")
+	}
+}
+
+func TestSeatbeltProfile_DenySSH(t *testing.T) {
+	profile := seatbeltProfile("/work", "/tmp/sandbox")
+	if !strings.Contains(profile, ".ssh") {
+		t.Error("profile should deny .ssh access")
+	}
+}
+
+func TestSeatbeltProfile_WriteDir(t *testing.T) {
+	profile := seatbeltProfile("/work", "/tmp/sandbox-xyz")
+	if !strings.Contains(profile, "/tmp/sandbox-xyz") {
+		t.Error("profile should allow writes to the specified dir")
+	}
+	if !strings.Contains(profile, "file-write*") {
+		t.Error("profile should have file-write rule")
+	}
+}

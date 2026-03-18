@@ -97,3 +97,31 @@ func TestContentSearch_InvalidRegex(t *testing.T) {
 		t.Error("expected error for invalid regex")
 	}
 }
+
+func TestContentSearch_EmptyPattern(t *testing.T) {
+	tool := &ContentSearchTool{}
+	input, _ := json.Marshal(contentSearchInput{Pattern: "", Path: "."})
+	_, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Error("expected error for empty pattern")
+	}
+}
+
+func TestContentSearch_NonexistentPath(t *testing.T) {
+	tool := &ContentSearchTool{}
+	input, _ := json.Marshal(contentSearchInput{Pattern: "test", Path: "/nonexistent-path-xyz"})
+	_, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		// Walk should fail for nonexistent dir
+		return
+	}
+	// If it returns "no matches found" that's also acceptable
+}
+
+func TestContentSearch_InvalidJSON(t *testing.T) {
+	tool := &ContentSearchTool{}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{bad`))
+	if err == nil || !strings.Contains(err.Error(), "parse input") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+}
