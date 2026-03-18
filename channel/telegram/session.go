@@ -351,6 +351,14 @@ func (sm *SessionManager) resolveCompactionThreshold() float64 {
 	return 0.30
 }
 
+func (sm *SessionManager) authRedirectURL() string {
+	cbURL := sm.cfg.GWSCallbackURL()
+	if cbURL == "" {
+		return ""
+	}
+	return strings.TrimSuffix(cbURL, "/auth/google/callback") + "/auth/redirect"
+}
+
 func (sm *SessionManager) gwsEnabled() bool {
 	return sm.cfg.Integrations != nil && sm.cfg.Integrations.GWS != nil && sm.cfg.Integrations.GWS.Enabled
 }
@@ -372,14 +380,15 @@ func (sm *SessionManager) newAgent(history []provider.Message, onToolStart func(
 
 	if sm.gwsEnabled() && sm.interactor != nil {
 		toolReg.Register(tools.NewGWSExecuteTool(tools.GWSToolConfig{
-			Interactor:   sm.interactor,
-			ScopeChecker: &tools.GoogleScopeChecker{TokenDBPath: sm.cfg.GoogleTokenDBPath()},
-			Bridge:       sm.tokenBridge,
-			ScopeWaiter:  sm.scopeWaiter,
-			Google:       sm.googleAuth,
-			Account:      sm.account,
-			Manifest:     sm.manifest,
-			Runner:       tools.NewGWSRunner(),
+			Interactor:      sm.interactor,
+			ScopeChecker:    &tools.GoogleScopeChecker{TokenDBPath: sm.cfg.GoogleTokenDBPath()},
+			Bridge:          sm.tokenBridge,
+			ScopeWaiter:     sm.scopeWaiter,
+			Google:          sm.googleAuth,
+			Account:         sm.account,
+			Manifest:        sm.manifest,
+			Runner:          tools.NewGWSRunner(),
+			AuthRedirectURL: sm.authRedirectURL(),
 		}))
 	}
 
