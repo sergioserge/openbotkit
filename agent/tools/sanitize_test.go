@@ -143,7 +143,11 @@ func TestNormalizeHomoglyphs(t *testing.T) {
 }
 
 func TestIsUntrustedTool(t *testing.T) {
-	untrusted := []string{"bash", "file_read", "gws_execute", "slack_read_channel", "slack_read_thread", "slack_search"}
+	untrusted := []string{
+		"bash", "file_read", "gws_execute",
+		"slack_read_channel", "slack_read_thread", "slack_search",
+		"dir_explore", "content_search", "sandbox_exec",
+	}
 	for _, name := range untrusted {
 		if !IsUntrustedTool(name) {
 			t.Errorf("expected %q to be untrusted", name)
