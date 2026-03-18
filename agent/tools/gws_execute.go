@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -27,7 +28,8 @@ type GWSToolConfig struct {
 	Manifest      *skills.Manifest
 	Runner        CommandRunner
 	AuthTimeout   time.Duration
-	ApprovalRules *ApprovalRuleSet
+	ApprovalRules  *ApprovalRuleSet
+	AuthRedirectURL string
 }
 
 // GWSExecuteTool routes all gws commands through a single tool
@@ -42,7 +44,8 @@ type GWSExecuteTool struct {
 	manifest      *skills.Manifest
 	runner        CommandRunner
 	authTimeout   time.Duration
-	approvalRules *ApprovalRuleSet
+	approvalRules   *ApprovalRuleSet
+	authRedirectURL string
 }
 
 func NewGWSExecuteTool(cfg GWSToolConfig) *GWSExecuteTool {
@@ -59,8 +62,9 @@ func NewGWSExecuteTool(cfg GWSToolConfig) *GWSExecuteTool {
 		account:       cfg.Account,
 		manifest:      cfg.Manifest,
 		runner:        cfg.Runner,
-		authTimeout:   timeout,
-		approvalRules: cfg.ApprovalRules,
+		authTimeout:     timeout,
+		approvalRules:   cfg.ApprovalRules,
+		authRedirectURL: cfg.AuthRedirectURL,
 	}
 }
 
@@ -209,6 +213,9 @@ func (g *GWSExecuteTool) requestConsent(ctx context.Context, scopes []string) er
 	url, err := g.google.AuthURL(g.account, scopes, state)
 	if err != nil {
 		return fmt.Errorf("generate auth URL: %w", err)
+	}
+	if g.authRedirectURL != "" {
+		url = g.authRedirectURL + "?url=" + neturl.QueryEscape(url)
 	}
 	// Register before notifying so Signal can't race ahead of Await.
 	g.scopeWaiter.Register(state, scopes, g.account)

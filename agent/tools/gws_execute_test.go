@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -735,5 +736,136 @@ func TestGWSExecute_TruncatesLargeOutput(t *testing.T) {
 	}
 	if len(result) >= len(bigOutput) {
 		t.Errorf("result should be truncated: got %d bytes, original %d", len(result), len(bigOutput))
+	}
+}
+
+func TestGWSExecute_AuthRedirectWrapsURL(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "tokens.db")
+	credPath := writeTestCreds(t, dir)
+
+	store, err := google.NewTokenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok := &oauth2.Token{
+		AccessToken:  "test-token",
+		RefreshToken: "test-refresh",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}
+	if err := store.SaveToken("user@test.com", tok, []string{"openid", "email"}); err != nil {
+		t.Fatal(err)
+	}
+	store.Close()
+
+	g := google.New(google.Config{
+		CredentialsFile: credPath,
+		TokenDBPath:     dbPath,
+	})
+
+	linkCh := make(chan struct{ text, url string }, 1)
+	inter := &mockInteractor{approveAll: false, linkCh: linkCh}
+
+	waiter := google.NewScopeWaiter()
+	checker := &mockScopeChecker{scopes: map[string]bool{}}
+
+	tool := NewGWSExecuteTool(GWSToolConfig{
+		Interactor:      inter,
+		ScopeChecker:    checker,
+		Bridge:          NewTokenBridge(g, "user@test.com"),
+		ScopeWaiter:     waiter,
+		Google:          g,
+		Account:         "user@test.com",
+		Manifest:        &skills.Manifest{Skills: map[string]skills.SkillEntry{"gws-calendar-list": {Source: "gws", Scopes: []string{"calendar"}}}},
+		Runner:          &mockRunner{outputs: map[string]string{}},
+		AuthTimeout:     100 * time.Millisecond,
+		AuthRedirectURL: "https://example.ngrok-free.app/auth/redirect",
+	})
+
+	go func() {
+		input, _ := json.Marshal(gwsInput{Command: "calendar events list"})
+		tool.Execute(context.Background(), input)
+	}()
+
+	var link struct{ text, url string }
+	select {
+	case link = <-linkCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for auth link")
+	}
+
+	if !strings.HasPrefix(link.url, "https://example.ngrok-free.app/auth/redirect?url=") {
+		t.Fatalf("link should start with trampoline URL, got %q", link.url)
+	}
+	// The url param should decode to a Google OAuth URL.
+	parsed, err := neturl.Parse(link.url)
+	if err != nil {
+		t.Fatalf("parse link: %v", err)
+	}
+	inner := parsed.Query().Get("url")
+	if !strings.HasPrefix(inner, "https://accounts.google.com/") {
+		t.Errorf("inner URL should be Google OAuth, got %q", inner)
+	}
+}
+
+func TestGWSExecute_NoAuthRedirectDirectURL(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "tokens.db")
+	credPath := writeTestCreds(t, dir)
+
+	store, err := google.NewTokenStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok := &oauth2.Token{
+		AccessToken:  "test-token",
+		RefreshToken: "test-refresh",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}
+	if err := store.SaveToken("user@test.com", tok, []string{"openid", "email"}); err != nil {
+		t.Fatal(err)
+	}
+	store.Close()
+
+	g := google.New(google.Config{
+		CredentialsFile: credPath,
+		TokenDBPath:     dbPath,
+	})
+
+	linkCh := make(chan struct{ text, url string }, 1)
+	inter := &mockInteractor{approveAll: false, linkCh: linkCh}
+
+	waiter := google.NewScopeWaiter()
+	checker := &mockScopeChecker{scopes: map[string]bool{}}
+
+	tool := NewGWSExecuteTool(GWSToolConfig{
+		Interactor:   inter,
+		ScopeChecker: checker,
+		Bridge:       NewTokenBridge(g, "user@test.com"),
+		ScopeWaiter:  waiter,
+		Google:       g,
+		Account:      "user@test.com",
+		Manifest:     &skills.Manifest{Skills: map[string]skills.SkillEntry{"gws-calendar-list": {Source: "gws", Scopes: []string{"calendar"}}}},
+		Runner:       &mockRunner{outputs: map[string]string{}},
+		AuthTimeout:  100 * time.Millisecond,
+		// AuthRedirectURL intentionally empty
+	})
+
+	go func() {
+		input, _ := json.Marshal(gwsInput{Command: "calendar events list"})
+		tool.Execute(context.Background(), input)
+	}()
+
+	var link struct{ text, url string }
+	select {
+	case link = <-linkCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for auth link")
+	}
+
+	if !strings.HasPrefix(link.url, "https://accounts.google.com/") {
+		t.Fatalf("link should go directly to Google, got %q", link.url)
 	}
 }
