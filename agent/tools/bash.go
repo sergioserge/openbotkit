@@ -14,9 +14,11 @@ const defaultBashTimeout = 30 * time.Second
 
 // BashTool executes shell commands.
 type BashTool struct {
-	timeout time.Duration
-	filter  *CommandFilter
-	workDir string
+	timeout       time.Duration
+	filter        *CommandFilter
+	workDir       string
+	interactor    Interactor
+	approvalRules *ApprovalRuleSet
 }
 
 // BashOption configures a BashTool.
@@ -30,6 +32,16 @@ func WithCommandFilter(f *CommandFilter) BashOption {
 // WithWorkDir sets the working directory for command execution.
 func WithWorkDir(dir string) BashOption {
 	return func(b *BashTool) { b.workDir = dir }
+}
+
+// WithInteractor sets the interactor for approval prompts.
+func WithInteractor(i Interactor) BashOption {
+	return func(b *BashTool) { b.interactor = i }
+}
+
+// WithApprovalRuleSet sets the approval rules for session-scoped auto-approve.
+func WithApprovalRuleSet(rules *ApprovalRuleSet) BashOption {
+	return func(b *BashTool) { b.approvalRules = rules }
 }
 
 // NewBashTool creates a new bash tool with the given timeout and options.
@@ -76,14 +88,32 @@ func (b *BashTool) Execute(ctx context.Context, input json.RawMessage) (string, 
 		return "", fmt.Errorf("gws commands must use the gws_execute tool, not bash")
 	}
 
-	if err := b.filter.Check(in.Command); err != nil {
-		return "", fmt.Errorf("command blocked: %w", err)
+	filterResult, filterErr := b.filter.CheckWithResult(in.Command)
+	switch filterResult {
+	case FilterDeny:
+		if filterErr != nil {
+			return "", fmt.Errorf("command blocked: %w", filterErr)
+		}
+		return "", fmt.Errorf("command blocked")
+	case FilterPrompt:
+		if b.interactor == nil {
+			return "", fmt.Errorf("command blocked: no interactor for approval")
+		}
+		return GuardedAction(ctx, b.interactor, RiskMedium,
+			"Run: "+in.Command,
+			func() (string, error) { return b.runCommand(ctx, in.Command) },
+			WithApprovalRules(b.approvalRules, "bash", input),
+		)
 	}
 
+	return b.runCommand(ctx, in.Command)
+}
+
+func (b *BashTool) runCommand(ctx context.Context, command string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, b.timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "bash", "-c", in.Command)
+	cmd := exec.CommandContext(ctx, "bash", "-c", command)
 	if b.workDir != "" {
 		cmd.Dir = b.workDir
 	}

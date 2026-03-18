@@ -146,3 +146,17 @@ func TestExtractPattern_GWSMissingCommand(t *testing.T) {
 		t.Errorf("pattern = %q, want gws_execute (fallback)", p)
 	}
 }
+
+func TestExtractPattern_BashCommand(t *testing.T) {
+	input, _ := json.Marshal(map[string]string{"command": "curl example.com"})
+	if p := extractPattern("bash", input); p != "curl" {
+		t.Errorf("pattern = %q, want curl", p)
+	}
+}
+
+func TestExtractPattern_BashSingleWord(t *testing.T) {
+	input, _ := json.Marshal(map[string]string{"command": "ls"})
+	if p := extractPattern("bash", input); p != "ls" {
+		t.Errorf("pattern = %q, want ls", p)
+	}
+}

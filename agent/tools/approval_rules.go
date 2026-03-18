@@ -124,6 +124,13 @@ func extractPattern(toolName string, input json.RawMessage) string {
 		return ""
 	}
 	switch toolName {
+	case "bash":
+		if cmd, ok := m["command"]; ok {
+			var s string
+			if json.Unmarshal(cmd, &s) == nil {
+				return firstToken(s)
+			}
+		}
 	case "slack_send", "slack_read_channel":
 		if ch, ok := m["channel"]; ok {
 			var s string
