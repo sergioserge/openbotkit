@@ -319,7 +319,9 @@ func TestDelegateTask_AsyncCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	var resp struct{ TaskID string `json:"task_id"` }
+	var resp struct {
+		TaskID string `json:"task_id"`
+	}
 	json.Unmarshal([]byte(result), &resp)
 
 	// Wait for goroutine to start, then release.
@@ -374,7 +376,9 @@ func TestDelegateTask_AsyncFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	var resp struct{ TaskID string `json:"task_id"` }
+	var resp struct {
+		TaskID string `json:"task_id"`
+	}
 	json.Unmarshal([]byte(result), &resp)
 
 	<-runner.called
@@ -572,7 +576,9 @@ func TestDelegateTask_AsyncStreamingCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	var resp struct{ TaskID string `json:"task_id"` }
+	var resp struct {
+		TaskID string `json:"task_id"`
+	}
 	json.Unmarshal([]byte(result), &resp)
 
 	// Wait for completion notification.
@@ -627,7 +633,9 @@ func TestDelegateTask_AsyncStreamingFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	var resp struct{ TaskID string `json:"task_id"` }
+	var resp struct {
+		TaskID string `json:"task_id"`
+	}
 	json.Unmarshal([]byte(result), &resp)
 
 	select {
@@ -921,7 +929,9 @@ func TestDelegateTask_AsyncWritesResultFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	var resp struct{ TaskID string `json:"task_id"` }
+	var resp struct {
+		TaskID string `json:"task_id"`
+	}
 	json.Unmarshal([]byte(result), &resp)
 
 	<-runner.called

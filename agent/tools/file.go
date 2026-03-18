@@ -41,8 +41,10 @@ func (f *FileReadTool) Execute(_ context.Context, input json.RawMessage) (string
 // FileWriteTool writes content to a file.
 type FileWriteTool struct{}
 
-func (f *FileWriteTool) Name() string        { return "file_write" }
-func (f *FileWriteTool) Description() string { return "Write content to a file (creates or overwrites)" }
+func (f *FileWriteTool) Name() string { return "file_write" }
+func (f *FileWriteTool) Description() string {
+	return "Write content to a file (creates or overwrites)"
+}
 func (f *FileWriteTool) InputSchema() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",

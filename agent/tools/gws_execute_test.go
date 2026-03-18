@@ -378,8 +378,8 @@ func TestGWSExecute_StructuredParams(t *testing.T) {
 	input, _ := json.Marshal(map[string]any{
 		"command": "drive files list",
 		"params": map[string]any{
-			"q":       "mimeType='application/vnd.google-apps.document'",
-			"orderBy": "modifiedTime desc",
+			"q":        "mimeType='application/vnd.google-apps.document'",
+			"orderBy":  "modifiedTime desc",
 			"pageSize": 5,
 		},
 	})
