@@ -19,7 +19,7 @@ import (
 	"github.com/73ai/openbotkit/oauth/google"
 	"github.com/73ai/openbotkit/provider"
 	historysrc "github.com/73ai/openbotkit/source/history"
-	"github.com/73ai/openbotkit/source/scheduler"
+	"github.com/73ai/openbotkit/service/scheduler"
 	slacksrc "github.com/73ai/openbotkit/source/slack"
 	usagesrc "github.com/73ai/openbotkit/service/usage"
 	"github.com/73ai/openbotkit/store"
