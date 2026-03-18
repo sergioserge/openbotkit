@@ -76,6 +76,9 @@ func NewStandardRegistry(inter Interactor, rules *ApprovalRuleSet) *Registry {
 	r.Register(NewFileEditTool(inter, rules))
 	r.Register(&LoadSkillsTool{})
 	r.Register(&SearchSkillsTool{})
+	r.Register(&DirExploreTool{})
+	r.Register(&ContentSearchTool{})
+	r.Register(NewSandboxExecTool(DetectRuntime()))
 	return r
 }
 
@@ -91,6 +94,8 @@ func NewScheduledTaskRegistry() *Registry {
 	r.Register(&FileReadTool{})
 	r.Register(&LoadSkillsTool{})
 	r.Register(&SearchSkillsTool{})
+	r.Register(&DirExploreTool{})
+	r.Register(&ContentSearchTool{})
 	return r
 }
 

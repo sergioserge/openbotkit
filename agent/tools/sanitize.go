@@ -127,6 +127,9 @@ func normalizeHomoglyphs(s string) string {
 var untrustedOutputTools = map[string]bool{
 	"bash":               true,
 	"file_read":          true,
+	"dir_explore":        true,
+	"content_search":     true,
+	"sandbox_exec":       true,
 	"gws_execute":        true,
 	"slack_read_channel": true,
 	"slack_read_thread":  true,

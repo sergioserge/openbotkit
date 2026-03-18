@@ -19,6 +19,7 @@ func TestNewStandardRegistry_Tools(t *testing.T) {
 	want := map[string]bool{
 		"bash": true, "file_read": true, "file_write": true,
 		"file_edit": true, "load_skills": true, "search_skills": true,
+		"dir_explore": true, "content_search": true, "sandbox_exec": true,
 	}
 	for _, name := range r.ToolNames() {
 		if !want[name] {
@@ -43,7 +44,7 @@ func TestNewStandardRegistry_BashBlocksCurl(t *testing.T) {
 func TestNewScheduledTaskRegistry_Tools(t *testing.T) {
 	r := NewScheduledTaskRegistry()
 	names := r.ToolNames()
-	want := []string{"bash", "file_read", "load_skills", "search_skills"}
+	want := []string{"bash", "content_search", "dir_explore", "file_read", "load_skills", "search_skills"}
 	sort.Strings(want)
 
 	if len(names) != len(want) {
