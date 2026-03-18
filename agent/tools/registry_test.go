@@ -41,6 +41,27 @@ func TestNewStandardRegistry_BashBlocksCurl(t *testing.T) {
 	}
 }
 
+func TestNewStandardRegistry_WithInteractor(t *testing.T) {
+	inter := &mockInteractor{approveAll: true}
+	rules := NewApprovalRuleSet()
+	r := NewStandardRegistry(inter, rules)
+	// ls should auto-run (on allowlist)
+	input, _ := json.Marshal(bashInput{Command: "ls"})
+	_, err := r.Execute(context.Background(), provider.ToolCall{Name: "bash", Input: input})
+	if err != nil {
+		t.Errorf("expected ls to pass with interactor: %v", err)
+	}
+	// curl should prompt and be approved
+	input2, _ := json.Marshal(bashInput{Command: "curl --version"})
+	out, err := r.Execute(context.Background(), provider.ToolCall{Name: "bash", Input: input2})
+	if err != nil {
+		t.Errorf("expected curl to be approved: %v", err)
+	}
+	if out == "denied_by_user" {
+		t.Error("interactor approves all, should not deny")
+	}
+}
+
 func TestNewScheduledTaskRegistry_Tools(t *testing.T) {
 	r := NewScheduledTaskRegistry()
 	names := r.ToolNames()

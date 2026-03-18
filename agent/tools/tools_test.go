@@ -535,6 +535,42 @@ func TestBuildSystemBlocks_WithExtras(t *testing.T) {
 	}
 }
 
+func TestBuildBaseSystemPrompt_DirExploreInstructions(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "dir_explore"})
+	prompt := BuildBaseSystemPrompt(reg)
+	if !strings.Contains(prompt, "File exploration") {
+		t.Error("prompt missing dir_explore instructions")
+	}
+}
+
+func TestBuildBaseSystemPrompt_NoDirExploreInstructions(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "bash"})
+	prompt := BuildBaseSystemPrompt(reg)
+	if strings.Contains(prompt, "File exploration") {
+		t.Error("prompt should not contain dir_explore instructions without dir_explore")
+	}
+}
+
+func TestBuildBaseSystemPrompt_SandboxExecInstructions(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "sandbox_exec"})
+	prompt := BuildBaseSystemPrompt(reg)
+	if !strings.Contains(prompt, "Sandboxed execution") {
+		t.Error("prompt missing sandbox_exec instructions")
+	}
+}
+
+func TestBuildBaseSystemPrompt_NoSandboxExecInstructions(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "bash"})
+	prompt := BuildBaseSystemPrompt(reg)
+	if strings.Contains(prompt, "Sandboxed execution") {
+		t.Error("prompt should not contain sandbox_exec instructions without sandbox_exec")
+	}
+}
+
 func TestFileEditNotFound(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "edit.txt")
