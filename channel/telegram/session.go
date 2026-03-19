@@ -506,18 +506,21 @@ func (sm *SessionManager) registerLearningsTools(reg *tools.Registry) {
 	}
 
 	deps := tools.LearningsDeps{
-		Store:    st,
-		BaseURL:  baseURL,
-		Notifier: notifier,
+		Store:   st,
+		BaseURL: baseURL,
 	}
 	reg.Register(tools.NewLearningSaveTool(deps))
 	reg.Register(tools.NewLearningReadTool(deps))
 	reg.Register(tools.NewLearningSearchTool(deps))
 
 	extractDeps := tools.LearningsExtractDeps{
-		LearningsDeps: deps,
-		Provider:      sm.provider,
-		Model:         sm.model,
+		LearningsDeps: tools.LearningsDeps{
+			Store:    st,
+			BaseURL:  baseURL,
+			Notifier: notifier,
+		},
+		Provider: sm.provider,
+		Model:    sm.model,
 	}
 	reg.Register(tools.NewLearningExtractTool(extractDeps))
 }
