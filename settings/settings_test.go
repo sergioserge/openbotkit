@@ -498,6 +498,208 @@ func TestGWSCallbackAndNgrok(t *testing.T) {
 	}
 }
 
+func TestProvidersBeforeModels(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	modelsNode := svc.Tree()[1]
+	if modelsNode.Category == nil || modelsNode.Category.Label != "Models" {
+		t.Fatal("expected Models category at index 1")
+	}
+
+	first := modelsNode.Category.Children[0]
+	if first.Category == nil || first.Category.Key != "models.providers" {
+		t.Errorf("first child of Models should be Providers, got %+v", first)
+	}
+}
+
+func TestModelTierFieldsAreSelects(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	for _, key := range []string{"models.default", "models.complex", "models.fast", "models.nano"} {
+		f := findField(svc, key)
+		if f == nil {
+			t.Fatalf("%s field not found", key)
+		}
+		if f.Type != TypeSelect {
+			t.Errorf("%s type = %d, want TypeSelect (%d)", key, f.Type, TypeSelect)
+		}
+		if f.OptionsFunc == nil {
+			t.Errorf("%s should have OptionsFunc", key)
+		}
+	}
+}
+
+func TestModelOptionsShowOnlyConfiguredProviders(t *testing.T) {
+	cfg := &config.Config{
+		Models: &config.ModelsConfig{
+			Providers: map[string]config.ModelProviderConfig{
+				"anthropic": {APIKeyRef: "keychain:obk/anthropic"},
+			},
+		},
+	}
+	svc := testService(cfg)
+
+	field := findField(svc, "models.default")
+	if field == nil {
+		t.Fatal("models.default not found")
+	}
+
+	opts := svc.ResolvedOptions(field)
+	for _, o := range opts {
+		if o.Value == "" {
+			continue
+		}
+		if !strings.HasPrefix(o.Value, "anthropic/") {
+			t.Errorf("option %q should be from anthropic, got %q", o.Label, o.Value)
+		}
+	}
+	if len(opts) < 2 {
+		t.Errorf("expected at least (none) + 1 anthropic model, got %d options", len(opts))
+	}
+}
+
+func TestModelOptionsNoProvidersConfigured(t *testing.T) {
+	cfg := &config.Config{}
+	svc := testService(cfg)
+
+	field := findField(svc, "models.default")
+	if field == nil {
+		t.Fatal("models.default not found")
+	}
+
+	opts := svc.ResolvedOptions(field)
+	if len(opts) != 1 {
+		t.Fatalf("expected 1 placeholder option, got %d", len(opts))
+	}
+	if opts[0].Value != "" {
+		t.Errorf("placeholder option value = %q, want empty", opts[0].Value)
+	}
+}
+
+func TestProfileFilteredByConfiguredProviders(t *testing.T) {
+	cfg := &config.Config{
+		Models: &config.ModelsConfig{
+			Providers: map[string]config.ModelProviderConfig{
+				"gemini": {APIKeyRef: "keychain:obk/gemini"},
+			},
+		},
+	}
+	svc := testService(cfg)
+
+	field := findField(svc, "models.profile")
+	if field == nil {
+		t.Fatal("models.profile not found")
+	}
+
+	opts := svc.ResolvedOptions(field)
+	for _, o := range opts {
+		if o.Value == "" {
+			continue
+		}
+		p, ok := config.Profiles[o.Value]
+		if !ok {
+			continue
+		}
+		for _, req := range p.Providers {
+			if req != "gemini" {
+				t.Errorf("profile %q requires %q but only gemini is configured", o.Value, req)
+			}
+		}
+	}
+}
+
+func TestAfterSetCalledOnAPIKey(t *testing.T) {
+	cfg := config.Default()
+	verified := false
+	svc := New(cfg,
+		WithSaveFn(func(*config.Config) error { return nil }),
+		WithStoreCred(func(ref, value string) error { return nil }),
+		WithLoadCred(func(ref string) (string, error) { return "key", nil }),
+		WithVerifyProvider(func(name string, pcfg config.ModelProviderConfig) error {
+			verified = true
+			return nil
+		}),
+	)
+
+	field := findField(svc, "models.providers.anthropic.api_key")
+	if field == nil {
+		t.Fatal("anthropic api_key not found")
+	}
+	if field.AfterSet == nil {
+		t.Fatal("api_key field should have AfterSet")
+	}
+
+	if err := svc.SetValue(field, "sk-test"); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := field.AfterSet(svc)
+	if !verified {
+		t.Error("verifyProvider was not called")
+	}
+	if !strings.Contains(msg, "verified") {
+		t.Errorf("AfterSet msg = %q, want to contain 'verified'", msg)
+	}
+}
+
+func TestAfterSetVerifyFailure(t *testing.T) {
+	cfg := config.Default()
+	svc := New(cfg,
+		WithSaveFn(func(*config.Config) error { return nil }),
+		WithStoreCred(func(ref, value string) error { return nil }),
+		WithLoadCred(func(ref string) (string, error) { return "key", nil }),
+		WithVerifyProvider(func(name string, pcfg config.ModelProviderConfig) error {
+			return fmt.Errorf("invalid key")
+		}),
+	)
+
+	field := findField(svc, "models.providers.openai.api_key")
+	if field == nil {
+		t.Fatal("openai api_key not found")
+	}
+
+	if err := svc.SetValue(field, "sk-bad"); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := field.AfterSet(svc)
+	if !strings.Contains(msg, "Warning") {
+		t.Errorf("AfterSet msg = %q, want to contain 'Warning'", msg)
+	}
+	if !strings.Contains(msg, "invalid key") {
+		t.Errorf("AfterSet msg = %q, want to contain error detail", msg)
+	}
+}
+
+func TestResolvedOptionsFallsBackToStatic(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	field := findField(svc, "mode")
+	if field == nil {
+		t.Fatal("mode field not found")
+	}
+
+	opts := svc.ResolvedOptions(field)
+	if len(opts) != 3 {
+		t.Errorf("mode options count = %d, want 3", len(opts))
+	}
+}
+
+func TestVerifyProviderNilHandler(t *testing.T) {
+	cfg := config.Default()
+	svc := New(cfg,
+		WithSaveFn(func(*config.Config) error { return nil }),
+	)
+
+	err := svc.VerifyProvider("anthropic", config.ModelProviderConfig{})
+	if err != nil {
+		t.Errorf("nil verifyProvider should return nil, got %v", err)
+	}
+}
+
 func findField(svc *Service, key string) *Field {
 	return findFieldInNodes(svc.Tree(), key)
 }
