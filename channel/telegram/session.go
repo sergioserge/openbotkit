@@ -13,8 +13,10 @@ import (
 	"github.com/73ai/openbotkit/agent"
 	"github.com/73ai/openbotkit/agent/audit"
 	"github.com/73ai/openbotkit/agent/tools"
+	"github.com/73ai/openbotkit/channel"
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/internal/skills"
+	"github.com/73ai/openbotkit/service/learnings"
 	"github.com/73ai/openbotkit/service/memory"
 	"github.com/73ai/openbotkit/oauth/google"
 	"github.com/73ai/openbotkit/provider"
@@ -395,6 +397,7 @@ func (sm *SessionManager) newAgent(history []provider.Message, onToolStart func(
 	sm.registerSlackTools(toolReg)
 	sm.registerDelegateTool(toolReg)
 	sm.registerScheduleTools(toolReg)
+	sm.registerLearningsTools(toolReg)
 	sm.registerWebTools(toolReg)
 
 	scratchDir := config.ScratchDir(sid)
@@ -478,6 +481,45 @@ func (sm *SessionManager) registerScheduleTools(reg *tools.Registry) {
 	reg.Register(tools.NewCreateScheduleTool(deps))
 	reg.Register(tools.NewListSchedulesTool(deps))
 	reg.Register(tools.NewDeleteScheduleTool(deps))
+}
+
+func (sm *SessionManager) registerLearningsTools(reg *tools.Registry) {
+	st := learnings.New(config.LearningsDir())
+
+	var baseURL string
+	if sm.cfg.Integrations != nil && sm.cfg.Integrations.GWS != nil && sm.cfg.Integrations.GWS.NgrokDomain != "" {
+		baseURL = "https://" + sm.cfg.Integrations.GWS.NgrokDomain
+	}
+
+	var notifier tools.LearningsNotifier
+	var botToken string
+	var ownerID int64
+	if sm.cfg.Channels != nil && sm.cfg.Channels.Telegram != nil {
+		botToken = sm.cfg.Channels.Telegram.BotToken
+		ownerID = sm.cfg.Channels.Telegram.OwnerID
+	}
+	if botToken != "" && ownerID != 0 {
+		pusher, err := channel.NewTelegramPusher(botToken, ownerID)
+		if err == nil {
+			notifier = pusher
+		}
+	}
+
+	deps := tools.LearningsDeps{
+		Store:    st,
+		BaseURL:  baseURL,
+		Notifier: notifier,
+	}
+	reg.Register(tools.NewLearningSaveTool(deps))
+	reg.Register(tools.NewLearningReadTool(deps))
+	reg.Register(tools.NewLearningSearchTool(deps))
+
+	extractDeps := tools.LearningsExtractDeps{
+		LearningsDeps: deps,
+		Provider: sm.provider,
+		Model:    sm.model,
+	}
+	reg.Register(tools.NewLearningExtractTool(extractDeps))
 }
 
 func (sm *SessionManager) initWebSearch() {
