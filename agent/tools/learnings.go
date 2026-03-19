@@ -253,6 +253,14 @@ func (t *LearningExtractTool) run(ctx context.Context, material string) {
 		return
 	}
 
+	// Snapshot existing topics so we only link new ones in the notification.
+	existingTopics := make(map[string]bool)
+	if before, _ := t.deps.Store.List(); len(before) > 0 {
+		for _, topic := range before {
+			existingTopics[topic] = true
+		}
+	}
+
 	subDeps := LearningsDeps{Store: t.deps.Store}
 	toolReg := NewRegistry()
 	toolReg.Register(NewLearningSaveTool(subDeps))
@@ -290,7 +298,9 @@ After saving, reply with a short friendly 1-2 sentence summary of what you saved
 		if t.deps.BaseURL != "" {
 			topics, _ := t.deps.Store.List()
 			for _, topic := range topics {
-				msg += fmt.Sprintf("\n%s/learnings/%s", t.deps.BaseURL, topic)
+				if !existingTopics[topic] {
+					msg += fmt.Sprintf("\n%s/learnings/%s", t.deps.BaseURL, topic)
+				}
 			}
 		}
 		if err := t.deps.Notifier.Push(ctx, msg); err != nil {
