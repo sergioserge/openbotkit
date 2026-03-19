@@ -18,6 +18,7 @@ import (
 	tgchannel "github.com/73ai/openbotkit/channel/telegram"
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/internal/skills"
+	learningssvc "github.com/73ai/openbotkit/service/learnings"
 	"github.com/73ai/openbotkit/service/memory"
 	"github.com/73ai/openbotkit/oauth/google"
 	"github.com/73ai/openbotkit/provider"
@@ -49,6 +50,7 @@ type Server struct {
 
 	scopeWaiter *google.ScopeWaiter
 	google      *google.Google
+	learnings   *learningssvc.Store
 }
 
 func New(cfg *config.Config, addr string) *Server {
@@ -69,6 +71,8 @@ func (s *Server) Run(ctx context.Context) error {
 		TokenDBPath:     s.cfg.GoogleTokenDBPath(),
 		CallbackURL:     s.cfg.GWSCallbackURL(),
 	})
+
+	s.learnings = learningssvc.New(config.LearningsDir())
 
 	s.migrateDBs()
 

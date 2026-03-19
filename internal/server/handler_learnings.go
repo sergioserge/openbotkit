@@ -2,9 +2,6 @@ package server
 
 import (
 	"net/http"
-
-	"github.com/73ai/openbotkit/config"
-	"github.com/73ai/openbotkit/service/learnings"
 )
 
 func (s *Server) handleLearnings(w http.ResponseWriter, r *http.Request) {
@@ -14,8 +11,7 @@ func (s *Server) handleLearnings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	st := learnings.New(config.LearningsDir())
-	content, err := st.Read(topic)
+	content, err := s.learnings.Read(topic)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
