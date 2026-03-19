@@ -671,33 +671,35 @@ func warnDefaultContextWindow(defaultSpec string) {
 	}
 }
 
-func validateProvider(name string, cfg config.ModelProviderConfig, model string) error {
-	factory, ok := provider.GetFactory(name)
-	if !ok {
-		return fmt.Errorf("unknown provider %q", name)
-	}
-
+func validateProvider(name string, pcfg config.ModelProviderConfig, model string) error {
 	var apiKey string
-	if cfg.AuthMethod != "vertex_ai" {
+	if pcfg.AuthMethod != "vertex_ai" {
 		envVar := provider.ProviderEnvVars[name]
 		var err error
-		apiKey, err = provider.ResolveAPIKey(cfg.APIKeyRef, envVar)
+		apiKey, err = provider.ResolveAPIKey(pcfg.APIKeyRef, envVar)
 		if err != nil {
 			return err
 		}
 	}
 
-	p := factory(cfg, apiKey)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, err := p.Chat(ctx, provider.ChatRequest{
-		Model:     model,
-		System:    "Reply with OK",
-		Messages:  []provider.Message{provider.NewTextMessage(provider.RoleUser, "hi")},
-		MaxTokens: 5,
-	})
-	return err
+	models, err := provider.ListModels(ctx, name, apiKey, pcfg)
+	if err != nil {
+		return err
+	}
+
+	// Cache the results.
+	cache := provider.NewModelCache(config.ModelsDir())
+	list := &provider.CachedModelList{
+		Provider:  name,
+		Models:    models,
+		FetchedAt: time.Now(),
+	}
+	_ = cache.Save(name, list)
+
+	return nil
 }
 
 func findProvider(name string) *providerInfo {

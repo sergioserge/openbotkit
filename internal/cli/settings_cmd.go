@@ -17,15 +17,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// testModels maps provider name to the cheapest model for verification.
-var testModels = map[string]string{
-	"anthropic":  "claude-haiku-4-5",
-	"openai":     "gpt-4o-mini",
-	"gemini":     "gemini-2.0-flash",
-	"groq":       "llama-3.1-8b-instant",
-	"openrouter": "google/gemini-2.0-flash",
-}
-
 var settingsCmd = &cobra.Command{
 	Use:   "settings",
 	Short: "Browse and edit settings",
@@ -43,12 +34,8 @@ var settingsCmd = &cobra.Command{
 	},
 }
 
+// verifyProviderKey validates the API key by calling the free ListModels API.
 func verifyProviderKey(name string, pcfg config.ModelProviderConfig) error {
-	factory, ok := provider.GetFactory(name)
-	if !ok {
-		return fmt.Errorf("unknown provider %q", name)
-	}
-
 	var apiKey string
 	if pcfg.AuthMethod != "vertex_ai" {
 		envVar := provider.ProviderEnvVars[name]
@@ -59,22 +46,28 @@ func verifyProviderKey(name string, pcfg config.ModelProviderConfig) error {
 		}
 	}
 
-	model := testModels[name]
-	if model == "" {
-		return nil
-	}
-
-	p := factory(pcfg, apiKey)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, err := p.Chat(ctx, provider.ChatRequest{
-		Model:     model,
-		System:    "Reply with OK",
-		Messages:  []provider.Message{provider.NewTextMessage(provider.RoleUser, "hi")},
-		MaxTokens: 5,
-	})
-	return err
+	models, err := provider.ListModels(ctx, name, apiKey, pcfg)
+	if err != nil {
+		return err
+	}
+
+	// Cache the results.
+	cache := provider.NewModelCache(config.ModelsDir())
+	list := &provider.CachedModelList{
+		Provider:  name,
+		Models:    models,
+		FetchedAt: time.Now(),
+	}
+	// Preserve existing verification data.
+	if existing, loadErr := cache.Load(name); loadErr == nil && existing.VerifiedModels != nil {
+		list.VerifiedModels = existing.VerifiedModels
+	}
+	_ = cache.Save(name, list)
+
+	return nil
 }
 
 func init() {
