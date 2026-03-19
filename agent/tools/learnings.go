@@ -248,6 +248,11 @@ func (t *LearningExtractTool) Execute(ctx context.Context, input json.RawMessage
 }
 
 func (t *LearningExtractTool) run(ctx context.Context, material string) {
+	if t.deps.Provider == nil {
+		slog.Error("learnings: extraction skipped, no provider configured")
+		return
+	}
+
 	subDeps := LearningsDeps{Store: t.deps.Store}
 	toolReg := NewRegistry()
 	toolReg.Register(NewLearningSaveTool(subDeps))

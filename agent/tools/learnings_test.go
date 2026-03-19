@@ -144,6 +144,98 @@ func TestLearningSearchToolNoResults(t *testing.T) {
 	}
 }
 
+// mockNotifier records push messages for testing.
+type mockNotifier struct {
+	messages []string
+}
+
+func (m *mockNotifier) Push(_ context.Context, message string) error {
+	m.messages = append(m.messages, message)
+	return nil
+}
+
+func TestLearningSaveToolWithNotifier(t *testing.T) {
+	st := newTestStore(t)
+	notifier := &mockNotifier{}
+	tool := NewLearningSaveTool(LearningsDeps{
+		Store:    st,
+		BaseURL:  "https://example.ngrok.app",
+		Notifier: notifier,
+	})
+
+	input, _ := json.Marshal(learningSaveInput{
+		Topic:   "Go",
+		Bullets: []string{"goroutines are lightweight"},
+	})
+
+	_, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if len(notifier.messages) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(notifier.messages))
+	}
+	if !strings.Contains(notifier.messages[0], "Go") {
+		t.Errorf("notification should mention topic, got: %s", notifier.messages[0])
+	}
+	if !strings.Contains(notifier.messages[0], "example.ngrok.app/learnings/go") {
+		t.Errorf("notification should contain link, got: %s", notifier.messages[0])
+	}
+}
+
+func TestLearningReadToolNotFound(t *testing.T) {
+	st := newTestStore(t)
+	tool := NewLearningReadTool(LearningsDeps{Store: st})
+
+	input, _ := json.Marshal(learningReadInput{Topic: "nonexistent"})
+	_, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Error("expected error for missing topic")
+	}
+}
+
+func TestLearningSearchToolMissingQuery(t *testing.T) {
+	st := newTestStore(t)
+	tool := NewLearningSearchTool(LearningsDeps{Store: st})
+
+	input, _ := json.Marshal(learningSearchInput{})
+	_, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Error("expected error for missing query")
+	}
+}
+
+func TestLearningExtractToolReturnsImmediately(t *testing.T) {
+	st := newTestStore(t)
+	// Use nil provider/model — the goroutine will fail, but we only test
+	// that Execute returns immediately with the expected message.
+	tool := NewLearningExtractTool(LearningsExtractDeps{
+		LearningsDeps: LearningsDeps{Store: st},
+	})
+
+	input, _ := json.Marshal(learningExtractInput{Context: "Go has goroutines"})
+	result, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(result, "Extraction started") {
+		t.Errorf("expected extraction started message, got: %s", result)
+	}
+}
+
+func TestLearningExtractToolMissingContext(t *testing.T) {
+	st := newTestStore(t)
+	tool := NewLearningExtractTool(LearningsExtractDeps{
+		LearningsDeps: LearningsDeps{Store: st},
+	})
+
+	input, _ := json.Marshal(learningExtractInput{})
+	_, err := tool.Execute(context.Background(), input)
+	if err == nil {
+		t.Error("expected error for missing context")
+	}
+}
+
 func TestLearningSaveCreatesFile(t *testing.T) {
 	dir := t.TempDir()
 	st := learnings.New(dir)
