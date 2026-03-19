@@ -88,6 +88,7 @@ The tool handles authentication, scope checks, and approval for write operations
 When a tool result includes "user notified", keep your response brief — the user already got the details.
 If a gws_execute call fails, read the error output carefully — it usually contains the correct syntax or hints. Fix the command and retry (up to 3 attempts) before giving up. Common fixes: wrong subcommand name, missing required params, wrong field names in body.
 If the error mentions "API has not been used" or "SERVICE_DISABLED", extract the activation URL from the error and share it with the user so they can enable the API.
+IMPORTANT: To create or edit Google Sheets, Docs, or Slides, always use the service-specific API (sheets, docs, slides), NOT the Drive API. For example, use "sheets spreadsheets create" to create a spreadsheet, "docs documents create" to create a document. The Drive API (drive files create) can only create empty file shells without content. Use Drive only for file management (list, move, copy, delete, share, permissions).
 `)
 	}
 
