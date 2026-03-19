@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/73ai/openbotkit/agent"
 	"github.com/73ai/openbotkit/provider"
@@ -243,7 +244,11 @@ func (t *LearningExtractTool) Execute(ctx context.Context, input json.RawMessage
 		return "", fmt.Errorf("context is required")
 	}
 
-	go t.run(context.Background(), in.Context)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	go func() {
+		defer cancel()
+		t.run(ctx, in.Context)
+	}()
 
 	return "Extraction started. You'll get a notification when done.", nil
 }
