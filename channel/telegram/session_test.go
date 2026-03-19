@@ -821,3 +821,27 @@ func TestRun_ProcessesMessages(t *testing.T) {
 func newTaskTracker() *tools.TaskTracker {
 	return tools.NewTaskTracker()
 }
+
+func TestAuthRedirectURL_WithCallback(t *testing.T) {
+	cfg := config.Default()
+	cfg.Integrations = &config.IntegrationsConfig{
+		GWS: &config.GWSConfig{
+			CallbackURL: "https://example.ngrok-free.app/auth/google/callback",
+		},
+	}
+	sm := &SessionManager{cfg: cfg}
+	got := sm.authRedirectURL()
+	want := "https://example.ngrok-free.app/auth/redirect"
+	if got != want {
+		t.Fatalf("authRedirectURL() = %q, want %q", got, want)
+	}
+}
+
+func TestAuthRedirectURL_WithoutCallback(t *testing.T) {
+	cfg := config.Default()
+	sm := &SessionManager{cfg: cfg}
+	got := sm.authRedirectURL()
+	if got != "" {
+		t.Fatalf("authRedirectURL() = %q, want empty", got)
+	}
+}

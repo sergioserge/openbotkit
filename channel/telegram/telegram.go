@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -82,6 +83,9 @@ func (c *Channel) ReceiveMessage() (incomingMessage, error) {
 }
 
 func (c *Channel) SendLink(text string, url string) error {
+	if strings.Contains(url, "/auth/redirect") {
+		return c.sendWebAppLink(text, url)
+	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonURL(text, url),
@@ -89,6 +93,33 @@ func (c *Channel) SendLink(text string, url string) error {
 	)
 	msg := tgbotapi.NewMessage(c.chatID, text)
 	msg.ReplyMarkup = keyboard
+	_, err := c.bot.Send(msg)
+	return err
+}
+
+// webAppInfo mirrors Telegram's WebAppInfo for the inline keyboard web_app field.
+type webAppInfo struct {
+	URL string `json:"url"`
+}
+
+type webAppButton struct {
+	Text   string     `json:"text"`
+	WebApp webAppInfo `json:"web_app"`
+}
+
+type webAppKeyboard struct {
+	InlineKeyboard [][]webAppButton `json:"inline_keyboard"`
+}
+
+// sendWebAppLink sends a Mini App button so the trampoline page
+// can use Telegram.WebApp.openLink() to open the system browser.
+func (c *Channel) sendWebAppLink(text string, url string) error {
+	msg := tgbotapi.NewMessage(c.chatID, text)
+	msg.ReplyMarkup = webAppKeyboard{
+		InlineKeyboard: [][]webAppButton{{
+			{Text: text, WebApp: webAppInfo{URL: url}},
+		}},
+	}
 	_, err := c.bot.Send(msg)
 	return err
 }
