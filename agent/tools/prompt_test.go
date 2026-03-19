@@ -57,6 +57,22 @@ func TestBuildBaseSystemPrompt_WebInstructions(t *testing.T) {
 	}
 }
 
+func TestBuildBaseSystemPrompt_GWSServiceSpecificAPIGuidance(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&stubTool{name: "gws_execute"})
+
+	prompt := BuildBaseSystemPrompt(reg)
+	if !strings.Contains(prompt, "sheets spreadsheets create") {
+		t.Error("expected guidance to use sheets API for spreadsheets")
+	}
+	if !strings.Contains(prompt, "docs documents create") {
+		t.Error("expected guidance to use docs API for documents")
+	}
+	if !strings.Contains(prompt, "Drive API (drive files create) can only create empty file shells") {
+		t.Error("expected warning about Drive API limitations")
+	}
+}
+
 func TestBuildBaseSystemPrompt_NoWebInstructions(t *testing.T) {
 	reg := NewRegistry()
 

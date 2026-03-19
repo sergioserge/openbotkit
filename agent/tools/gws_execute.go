@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -15,6 +17,10 @@ import (
 )
 
 const defaultAuthTimeout = 5 * time.Minute
+
+var errAuthPending = errors.New("authorization pending")
+
+const authPendingMessage = "I've sent an authorization link. Please tap it to grant access, then try your request again."
 
 // GWSToolConfig configures a GWSExecuteTool.
 type GWSToolConfig struct {
@@ -27,7 +33,8 @@ type GWSToolConfig struct {
 	Manifest      *skills.Manifest
 	Runner        CommandRunner
 	AuthTimeout   time.Duration
-	ApprovalRules *ApprovalRuleSet
+	ApprovalRules  *ApprovalRuleSet
+	AuthRedirectURL string
 }
 
 // GWSExecuteTool routes all gws commands through a single tool
@@ -42,7 +49,8 @@ type GWSExecuteTool struct {
 	manifest      *skills.Manifest
 	runner        CommandRunner
 	authTimeout   time.Duration
-	approvalRules *ApprovalRuleSet
+	approvalRules   *ApprovalRuleSet
+	authRedirectURL string
 }
 
 func NewGWSExecuteTool(cfg GWSToolConfig) *GWSExecuteTool {
@@ -59,8 +67,9 @@ func NewGWSExecuteTool(cfg GWSToolConfig) *GWSExecuteTool {
 		account:       cfg.Account,
 		manifest:      cfg.Manifest,
 		runner:        cfg.Runner,
-		authTimeout:   timeout,
-		approvalRules: cfg.ApprovalRules,
+		authTimeout:     timeout,
+		approvalRules:   cfg.ApprovalRules,
+		authRedirectURL: cfg.AuthRedirectURL,
 	}
 }
 
@@ -94,6 +103,14 @@ type gwsInput struct {
 }
 
 func (g *GWSExecuteTool) Execute(ctx context.Context, input json.RawMessage) (string, error) {
+	// Discover account if not yet set (e.g. after first-time OAuth completed).
+	if g.account == "" {
+		if accounts, err := g.google.Accounts(ctx); err == nil && len(accounts) > 0 {
+			g.account = accounts[0]
+			g.bridge.SetAccount(accounts[0])
+		}
+	}
+
 	var in gwsInput
 	if err := json.Unmarshal(input, &in); err != nil {
 		return "", fmt.Errorf("parse input: %w", err)
@@ -128,6 +145,9 @@ func (g *GWSExecuteTool) Execute(ctx context.Context, input json.RawMessage) (st
 			}
 			if !has {
 				if err := g.requestConsent(ctx, requiredScopes); err != nil {
+					if errors.Is(err, errAuthPending) {
+						return authPendingMessage, nil
+					}
 					return "", err
 				}
 			}
@@ -152,13 +172,15 @@ func (g *GWSExecuteTool) run(ctx context.Context, args []string) (string, error)
 	env, err := g.bridge.Env(ctx)
 	if err != nil {
 		slog.Warn("gws_execute: token error, attempting re-auth", "error", err)
-		// Token expired or refresh failed — trigger re-consent and retry.
 		service := gwsServiceFromCommand(args)
 		scopes := g.scopesForService(service)
 		if len(scopes) == 0 {
 			return "", fmt.Errorf("get token: %w", err)
 		}
 		if cerr := g.requestConsent(ctx, scopes); cerr != nil {
+			if errors.Is(cerr, errAuthPending) {
+				return authPendingMessage, nil
+			}
 			return "", fmt.Errorf("get token: %w (re-auth also failed: %v)", err, cerr)
 		}
 		env, err = g.bridge.Env(ctx)
@@ -177,7 +199,11 @@ func (g *GWSExecuteTool) run(ctx context.Context, args []string) (string, error)
 		service := gwsServiceFromCommand(args)
 		scopes := g.scopesForService(service)
 		if len(scopes) > 0 {
-			if cerr := g.requestConsent(ctx, scopes); cerr == nil {
+			if cerr := g.requestConsent(ctx, scopes); cerr != nil {
+				if errors.Is(cerr, errAuthPending) {
+					return authPendingMessage, nil
+				}
+			} else {
 				env, err = g.bridge.Env(ctx)
 				if err == nil {
 					retryCtx, retryCancel := context.WithTimeout(ctx, 30*time.Second)
@@ -200,7 +226,7 @@ func (g *GWSExecuteTool) run(ctx context.Context, args []string) (string, error)
 	return out, runErr
 }
 
-func (g *GWSExecuteTool) requestConsent(ctx context.Context, scopes []string) error {
+func (g *GWSExecuteTool) requestConsent(_ context.Context, scopes []string) error {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return fmt.Errorf("generate state: %w", err)
@@ -210,8 +236,13 @@ func (g *GWSExecuteTool) requestConsent(ctx context.Context, scopes []string) er
 	if err != nil {
 		return fmt.Errorf("generate auth URL: %w", err)
 	}
-	// Register before notifying so Signal can't race ahead of Await.
+	if g.authRedirectURL != "" {
+		url = g.authRedirectURL + "?url=" + neturl.QueryEscape(url)
+	}
 	g.scopeWaiter.Register(state, scopes, g.account)
+
+	// Clean up the waiter entry in the background (drains channel or times out).
+	go g.scopeWaiter.Await(state, g.authTimeout)
 
 	if err := g.interactor.Notify("I need additional Google access to complete this request."); err != nil {
 		return fmt.Errorf("notify: %w", err)
@@ -220,23 +251,7 @@ func (g *GWSExecuteTool) requestConsent(ctx context.Context, scopes []string) er
 		return fmt.Errorf("notify link: %w", err)
 	}
 
-	if err := g.scopeWaiter.Await(state, g.authTimeout); err != nil {
-		return fmt.Errorf("auth: %w", err)
-	}
-
-	// After first-time auth, discover the account from the token store.
-	if g.account == "" {
-		accounts, err := g.google.Accounts(ctx)
-		if err == nil && len(accounts) > 0 {
-			g.account = accounts[0]
-			g.bridge.SetAccount(accounts[0])
-		}
-	}
-
-	if err := g.interactor.Notify("Access granted, thanks!"); err != nil {
-		return fmt.Errorf("notify: %w", err)
-	}
-	return nil
+	return errAuthPending
 }
 
 func (g *GWSExecuteTool) isWriteCommand(args []string) bool {
