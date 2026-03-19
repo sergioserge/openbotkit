@@ -83,9 +83,9 @@ func (t *LearningSaveTool) Execute(ctx context.Context, input json.RawMessage) (
 
 	if t.deps.Notifier != nil {
 		slug := t.deps.Store.Slug(in.Topic)
-		msg := fmt.Sprintf("Learned about **%s**:\n- %s", in.Topic, strings.Join(in.Bullets, "\n- "))
+		msg := fmt.Sprintf("Saved a learning about %s", in.Topic)
 		if t.deps.BaseURL != "" {
-			msg += fmt.Sprintf("\n\n%s/learnings/%s", t.deps.BaseURL, slug)
+			msg += fmt.Sprintf("\n%s/learnings/%s", t.deps.BaseURL, slug)
 		}
 		if err := t.deps.Notifier.Push(ctx, msg); err != nil {
 			slog.Warn("learnings: notification failed", "error", err)
@@ -272,19 +272,22 @@ Keep bullet points casual, concise, and useful. No emdashes.`
 		agent.WithMaxIterations(15),
 	)
 
-	result, err := a.Run(ctx, material)
+	_, err := a.Run(ctx, material)
 	if err != nil {
 		slog.Error("learnings: extraction failed", "error", err)
 		return
 	}
 
 	if t.deps.Notifier != nil {
-		msg := "Finished extracting learnings from your material."
-		if result != "" {
-			if len(result) > 200 {
-				result = result[:200] + "..."
+		msg := "Done! Extracted and saved your learnings."
+		if t.deps.BaseURL != "" {
+			topics, _ := t.deps.Store.List()
+			if len(topics) > 0 {
+				msg += " Check them out:"
+				for _, topic := range topics {
+					msg += fmt.Sprintf("\n%s/learnings/%s", t.deps.BaseURL, topic)
+				}
 			}
-			msg += "\n\n" + result
 		}
 		if err := t.deps.Notifier.Push(ctx, msg); err != nil {
 			slog.Warn("learnings: extract notification failed", "error", err)

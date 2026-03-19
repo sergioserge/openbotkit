@@ -175,11 +175,15 @@ func TestLearningSaveToolWithNotifier(t *testing.T) {
 	if len(notifier.messages) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(notifier.messages))
 	}
-	if !strings.Contains(notifier.messages[0], "Go") {
-		t.Errorf("notification should mention topic, got: %s", notifier.messages[0])
+	msg := notifier.messages[0]
+	if !strings.Contains(msg, "Saved a learning about Go") {
+		t.Errorf("notification should have short topic summary, got: %s", msg)
 	}
-	if !strings.Contains(notifier.messages[0], "example.ngrok.app/learnings/go") {
-		t.Errorf("notification should contain link, got: %s", notifier.messages[0])
+	if !strings.Contains(msg, "example.ngrok.app/learnings/go") {
+		t.Errorf("notification should contain link, got: %s", msg)
+	}
+	if strings.Contains(msg, "goroutines") {
+		t.Errorf("notification should NOT include bullet content, got: %s", msg)
 	}
 }
 
