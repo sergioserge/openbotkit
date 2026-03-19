@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"github.com/73ai/openbotkit/agent"
 	"github.com/73ai/openbotkit/provider"
@@ -247,23 +248,37 @@ func (t *LearningExtractTool) Execute(ctx context.Context, input json.RawMessage
 	return "Extraction started. You'll get a notification when done.", nil
 }
 
+// trackingSaveTool wraps LearningSaveTool to record which topics were saved.
+type trackingSaveTool struct {
+	inner *LearningSaveTool
+	mu    sync.Mutex
+	slugs []string
+}
+
+func (t *trackingSaveTool) Name() string               { return t.inner.Name() }
+func (t *trackingSaveTool) Description() string         { return t.inner.Description() }
+func (t *trackingSaveTool) InputSchema() json.RawMessage { return t.inner.InputSchema() }
+func (t *trackingSaveTool) Execute(ctx context.Context, input json.RawMessage) (string, error) {
+	var in learningSaveInput
+	if err := json.Unmarshal(input, &in); err == nil && in.Topic != "" {
+		slug := t.inner.deps.Store.Slug(in.Topic)
+		t.mu.Lock()
+		t.slugs = append(t.slugs, slug)
+		t.mu.Unlock()
+	}
+	return t.inner.Execute(ctx, input)
+}
+
 func (t *LearningExtractTool) run(ctx context.Context, material string) {
 	if t.deps.Provider == nil {
 		slog.Error("learnings: extraction skipped, no provider configured")
 		return
 	}
 
-	// Snapshot existing topics so we only link new ones in the notification.
-	existingTopics := make(map[string]bool)
-	if before, _ := t.deps.Store.List(); len(before) > 0 {
-		for _, topic := range before {
-			existingTopics[topic] = true
-		}
-	}
-
 	subDeps := LearningsDeps{Store: t.deps.Store}
+	tracker := &trackingSaveTool{inner: NewLearningSaveTool(subDeps)}
 	toolReg := NewRegistry()
-	toolReg.Register(NewLearningSaveTool(subDeps))
+	toolReg.Register(tracker)
 	toolReg.Register(NewLearningReadTool(subDeps))
 
 	system := `You are a learning extraction assistant. Read the provided material and extract key learnings.
@@ -296,11 +311,8 @@ After saving, reply with a short friendly 1-2 sentence summary of what you saved
 			msg = "Saved your learnings!"
 		}
 		if t.deps.BaseURL != "" {
-			topics, _ := t.deps.Store.List()
-			for _, topic := range topics {
-				if !existingTopics[topic] {
-					msg += fmt.Sprintf("\n%s/learnings/%s", t.deps.BaseURL, topic)
-				}
+			for _, slug := range tracker.slugs {
+				msg += fmt.Sprintf("\n%s/learnings/%s", t.deps.BaseURL, slug)
 			}
 		}
 		if err := t.deps.Notifier.Push(ctx, msg); err != nil {
