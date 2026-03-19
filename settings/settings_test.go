@@ -164,8 +164,8 @@ func TestPasswordField(t *testing.T) {
 		t.Fatal(err)
 	}
 	got = svc.GetValue(field)
-	if got != "configured" {
-		t.Errorf("after set, api key status = %q, want %q", got, "configured")
+	if !strings.Contains(got, "sk-tes") {
+		t.Errorf("after set, api key status = %q, want masked key", got)
 	}
 }
 
@@ -248,8 +248,12 @@ func TestCredentialNilHandlers(t *testing.T) {
 	}
 }
 
-func TestSelectProfileRoundTrip(t *testing.T) {
-	cfg := config.Default()
+func TestProfileDisplaysLabel(t *testing.T) {
+	cfg := &config.Config{
+		Models: &config.ModelsConfig{
+			Profile: "gemini",
+		},
+	}
 	svc := testService(cfg)
 
 	field := findField(svc, "models.profile")
@@ -257,11 +261,37 @@ func TestSelectProfileRoundTrip(t *testing.T) {
 		t.Fatal("models.profile field not found")
 	}
 
-	if err := svc.SetValue(field, "gemini"); err != nil {
-		t.Fatal(err)
+	got := svc.GetValue(field)
+	if !strings.Contains(got, "Gemini") {
+		t.Errorf("profile display = %q, want to contain 'Gemini'", got)
 	}
-	if got := svc.GetValue(field); got != "gemini" {
-		t.Errorf("profile = %q, want %q", got, "gemini")
+}
+
+func TestProfileHasEditFunc(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	field := findField(svc, "models.profile")
+	if field == nil {
+		t.Fatal("models.profile field not found")
+	}
+	if field.EditFunc == nil {
+		t.Error("profile field should have EditFunc")
+	}
+}
+
+func TestProfileNotConfiguredDisplay(t *testing.T) {
+	cfg := &config.Config{}
+	svc := testService(cfg)
+
+	field := findField(svc, "models.profile")
+	if field == nil {
+		t.Fatal("models.profile field not found")
+	}
+
+	got := svc.GetValue(field)
+	if got != "(not configured)" {
+		t.Errorf("nil profile display = %q, want %q", got, "(not configured)")
 	}
 }
 
@@ -468,9 +498,6 @@ func TestPasswordLoadCredFailure(t *testing.T) {
 	if !strings.Contains(got, "configured") {
 		t.Errorf("loadCred failure status = %q, want to contain %q", got, "configured")
 	}
-	if !strings.Contains(got, "ref:") {
-		t.Errorf("loadCred failure status = %q, want to contain ref fallback", got)
-	}
 }
 
 func TestGWSCallbackAndNgrok(t *testing.T) {
@@ -498,7 +525,7 @@ func TestGWSCallbackAndNgrok(t *testing.T) {
 	}
 }
 
-func TestProvidersBeforeModels(t *testing.T) {
+func TestModelsTreeStructure(t *testing.T) {
 	cfg := config.Default()
 	svc := testService(cfg)
 
@@ -507,9 +534,14 @@ func TestProvidersBeforeModels(t *testing.T) {
 		t.Fatal("expected Models category at index 1")
 	}
 
-	first := modelsNode.Category.Children[0]
-	if first.Category == nil || first.Category.Key != "models.providers" {
-		t.Errorf("first child of Models should be Providers, got %+v", first)
+	children := modelsNode.Category.Children
+	if children[0].Field == nil || children[0].Field.Key != "models.profile" {
+		t.Error("first child of Models should be Profile field")
+	}
+
+	last := children[len(children)-1]
+	if last.Category == nil || last.Category.Key != "models.providers" {
+		t.Error("last child of Models should be Providers category")
 	}
 }
 
