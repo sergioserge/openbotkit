@@ -32,7 +32,6 @@ type Field struct {
 	Set         func(*config.Config, string) error
 	Validate    func(string) error
 	AfterSet    func(*Service) string           // optional post-set message
-	EditFunc    func(*Service) (string, error)  // custom edit handler, replaces default form
 	ReadOnly    func(*config.Config) bool       // if true, field can't be edited
 }
 
@@ -124,6 +123,10 @@ func (s *Service) LoadCredential(ref string) (string, error) {
 		return "", fmt.Errorf("no credential loader configured")
 	}
 	return s.loadCred(ref)
+}
+
+func (s *Service) Save() error {
+	return s.saveFn(s.cfg)
 }
 
 func (s *Service) VerifyProvider(name string, cfg config.ModelProviderConfig) error {
