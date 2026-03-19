@@ -32,6 +32,8 @@ type Field struct {
 	Set         func(*config.Config, string) error
 	Validate    func(string) error
 	AfterSet    func(*Service) string           // optional post-set message
+	EditFunc    func(*Service) (string, error)  // custom edit handler, replaces default form
+	ReadOnly    func(*config.Config) bool       // if true, field can't be edited
 }
 
 type Category struct {
@@ -86,6 +88,10 @@ func New(cfg *config.Config, opts ...ServiceOption) *Service {
 
 func (s *Service) Tree() []Node { return s.tree }
 func (s *Service) Config() *config.Config { return s.cfg }
+
+func (s *Service) RebuildTree() {
+	s.tree = BuildTree(s)
+}
 
 func (s *Service) GetValue(f *Field) string {
 	return f.Get(s.cfg)
