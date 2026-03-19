@@ -9,6 +9,7 @@ import (
 	financecli "github.com/73ai/openbotkit/internal/cli/finance"
 	"github.com/73ai/openbotkit/internal/cli/gmail"
 	historycli "github.com/73ai/openbotkit/internal/cli/history"
+	learningscli "github.com/73ai/openbotkit/internal/cli/learnings"
 	imessagecli "github.com/73ai/openbotkit/internal/cli/imessage"
 	memorycli "github.com/73ai/openbotkit/internal/cli/memory"
 	slackcli "github.com/73ai/openbotkit/internal/cli/slack"
@@ -42,6 +43,7 @@ func init() {
 	rootCmd.AddCommand(serviceCmd)
 	rootCmd.AddCommand(gmail.Cmd)
 	rootCmd.AddCommand(historycli.Cmd)
+	rootCmd.AddCommand(learningscli.Cmd)
 	rootCmd.AddCommand(memorycli.Cmd)
 	rootCmd.AddCommand(slackcli.Cmd)
 	rootCmd.AddCommand(websearchcli.Cmd)
