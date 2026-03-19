@@ -70,3 +70,7 @@ func EnsureScratchDir(sessionID string) error {
 func CleanScratch(sessionID string) error {
 	return os.RemoveAll(ScratchDir(sessionID))
 }
+
+func LearningsDir() string {
+	return filepath.Join(Dir(), "learnings")
+}
