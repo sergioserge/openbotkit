@@ -161,6 +161,37 @@ func TestSendLink_SendsURLButton(t *testing.T) {
 	}
 }
 
+func TestSendLink_AuthRedirectUsesWebApp(t *testing.T) {
+	bot := &mockBot{}
+	ch := NewChannel(bot, 123)
+
+	authURL := "https://example.ngrok-free.app/auth/redirect?url=https%3A%2F%2Faccounts.google.com%2Fo%2Foauth2%2Fauth"
+	if err := ch.SendLink("Tap to grant access", authURL); err != nil {
+		t.Fatalf("SendLink: %v", err)
+	}
+
+	bot.mu.Lock()
+	defer bot.mu.Unlock()
+	if len(bot.sent) != 1 {
+		t.Fatalf("expected 1 sent message, got %d", len(bot.sent))
+	}
+	msg, ok := bot.sent[0].(tgbotapi.MessageConfig)
+	if !ok {
+		t.Fatalf("expected MessageConfig, got %T", bot.sent[0])
+	}
+	kb, ok := msg.ReplyMarkup.(webAppKeyboard)
+	if !ok {
+		t.Fatalf("expected webAppKeyboard, got %T", msg.ReplyMarkup)
+	}
+	if len(kb.InlineKeyboard) != 1 || len(kb.InlineKeyboard[0]) != 1 {
+		t.Fatal("expected 1 row with 1 button")
+	}
+	btn := kb.InlineKeyboard[0][0]
+	if btn.WebApp.URL != authURL {
+		t.Errorf("web_app URL = %q, want %q", btn.WebApp.URL, authURL)
+	}
+}
+
 func TestRequestApproval_SendsKeyboard(t *testing.T) {
 	bot := &mockBot{notify: make(chan struct{}, 1)}
 	ch := NewChannel(bot, 123)
