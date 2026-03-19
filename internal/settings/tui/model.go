@@ -22,20 +22,21 @@ const (
 type flashMsg struct{}
 
 type model struct {
-	svc      *settings.Service
-	rows     []row
-	expanded map[string]bool
-	cursor   int
-	state    state
-	form     *huh.Form
+	svc       *settings.Service
+	rows      []row
+	expanded  map[string]bool
+	cursor    int
+	state     state
+	form      *huh.Form
 	editField *settings.Field
-	editStr  *string
-	editBool *bool
-	flash    string
-	viewport viewport.Model
-	width    int
-	height   int
-	ready    bool
+	editStr   *string
+	editBool  *bool
+	flash     string
+	viewport  viewport.Model
+	width     int
+	height    int
+	ready     bool
+	runWizard *settings.Field
 }
 
 func newModel(svc *settings.Service) model {
@@ -117,6 +118,20 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 
 	if r.node.Field != nil {
 		f := r.node.Field
+
+		if f.ReadOnly != nil && f.ReadOnly(m.svc.Config()) {
+			m.flash = "Locked by profile — change profile to edit"
+			m.viewport.SetContent(m.renderTree())
+			return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+				return flashMsg{}
+			})
+		}
+
+		if f.EditFunc != nil {
+			m.runWizard = f
+			return m, tea.Quit
+		}
+
 		current := m.svc.GetValue(f)
 		form, strVal, boolVal := buildForm(f, current, m.svc)
 		m.state = stateEdit
