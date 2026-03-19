@@ -67,13 +67,13 @@ type model struct {
 	ready    bool
 
 	// Wizard state
-	wizardProfile   string
+	wizardProfile   *string
 	wizardProviders []string
 	wizardProvIdx   int
 	wizardTierIdx   int
 	wizardTiers     [4]string // default, complex, fast, nano
 	wizardSpinner   spinner.Model
-	wizardAPIKey    string
+	wizardAPIKey    *string
 	wizardError     string
 }
 
@@ -284,21 +284,23 @@ func (m model) enterProfileSelect() (model, tea.Cmd) {
 	}
 	opts = append(opts, huh.NewOption("Custom (choose models manually)", "custom"))
 
-	// Pre-select current profile.
+	// Allocate on heap so pointer survives bubbletea value copies.
+	selected := ""
 	cfg := m.svc.Config()
 	if cfg.Models != nil && cfg.Models.Profile != "" {
-		m.wizardProfile = cfg.Models.Profile
+		selected = cfg.Models.Profile
 	}
+	m.wizardProfile = &selected
 
 	m.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("How would you like to configure models?").
 				DescriptionFunc(func() string {
-					return settings.ProfilePreview(m.wizardProfile)
-				}, &m.wizardProfile).
+					return settings.ProfilePreview(*m.wizardProfile)
+				}, m.wizardProfile).
 				Options(opts...).
-				Value(&m.wizardProfile),
+				Value(m.wizardProfile),
 		),
 	)
 	return m, m.form.Init()
@@ -321,7 +323,7 @@ func (m model) updateProfileSelect(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.form.State == huh.StateCompleted {
-		if m.wizardProfile == "custom" {
+		if *m.wizardProfile == "custom" {
 			return m.enterCustomModelSelect()
 		}
 		return m.enterFixedProfileAuth()
@@ -333,7 +335,7 @@ func (m model) updateProfileSelect(msg tea.Msg) (tea.Model, tea.Cmd) {
 // --- Fixed profile: auth providers, then verify ---
 
 func (m model) enterFixedProfileAuth() (model, tea.Cmd) {
-	p := config.Profiles[m.wizardProfile]
+	p := config.Profiles[*m.wizardProfile]
 	m.wizardProviders = p.Providers
 
 	// Find the first provider that needs auth.
@@ -358,15 +360,17 @@ func (m model) nextProviderAuth() (model, tea.Cmd) {
 
 func (m model) enterProviderAuth(provName string) (model, tea.Cmd) {
 	m.state = stateProviderAuth
-	m.wizardAPIKey = ""
 	m.wizardError = ""
+
+	apiKey := ""
+	m.wizardAPIKey = &apiKey
 
 	m.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Enter " + provName + " API key").
 				EchoMode(huh.EchoModePassword).
-				Value(&m.wizardAPIKey),
+				Value(m.wizardAPIKey),
 		),
 	)
 	return m, m.form.Init()
@@ -391,14 +395,14 @@ func (m model) updateProviderAuth(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.form.State == huh.StateCompleted {
 		provName := m.wizardProviders[m.wizardProvIdx]
 
-		if m.wizardAPIKey == "" {
+		if *m.wizardAPIKey == "" {
 			m.wizardError = provName + " API key is required"
 			return m.enterProviderAuth(provName)
 		}
 
 		// Store credential.
 		ref := fmt.Sprintf("keychain:obk/%s", provName)
-		if err := m.svc.StoreCredential(ref, m.wizardAPIKey); err != nil {
+		if err := m.svc.StoreCredential(ref, *m.wizardAPIKey); err != nil {
 			m.wizardError = fmt.Sprintf("store credential: %v", err)
 			return m.enterProviderAuth(provName)
 		}
@@ -418,7 +422,7 @@ func (m model) updateProviderAuth(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.wizardError = ""
 		return m, tea.Batch(
 			m.wizardSpinner.Tick,
-			verifyProviderCmd(m.svc, provName, m.wizardAPIKey),
+			verifyProviderCmd(m.svc, provName, *m.wizardAPIKey),
 		)
 	}
 
@@ -500,15 +504,15 @@ func (m model) saveProfile() (model, tea.Cmd) {
 	cfg := m.svc.Config()
 	settings.EnsureModels(cfg)
 
-	if m.wizardProfile == "custom" {
+	if *m.wizardProfile == "custom" {
 		cfg.Models.Profile = ""
 		cfg.Models.Default = m.wizardTiers[0]
 		cfg.Models.Complex = m.wizardTiers[1]
 		cfg.Models.Fast = m.wizardTiers[2]
 		cfg.Models.Nano = m.wizardTiers[3]
 	} else {
-		p := config.Profiles[m.wizardProfile]
-		cfg.Models.Profile = m.wizardProfile
+		p := config.Profiles[*m.wizardProfile]
+		cfg.Models.Profile = *m.wizardProfile
 		cfg.Models.Default = p.Tiers.Default
 		cfg.Models.Complex = p.Tiers.Complex
 		cfg.Models.Fast = p.Tiers.Fast
@@ -537,16 +541,17 @@ func (m model) enterCustomModelSelect() (model, tea.Cmd) {
 	cfg := m.svc.Config()
 	configured := configuredProviderNames(cfg)
 
+	custom := "custom"
 	if len(configured) == 0 {
 		m.wizardProviders = []string{"anthropic", "openai", "gemini", "groq", "openrouter"}
 		m.wizardProvIdx = 0
-		m.wizardProfile = "custom"
+		m.wizardProfile = &custom
 		return m.enterProviderAuth(m.wizardProviders[0])
 	}
 
 	m.wizardProviders = configured
 	m.wizardTierIdx = 0
-	m.wizardProfile = "custom"
+	m.wizardProfile = &custom
 	return m.nextTierSelect()
 }
 
